@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#3d8b6e">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=3" rel="stylesheet">
+<link href="style.css?v=4" rel="stylesheet">
 </head>
 <body>
 
@@ -15,6 +15,8 @@
 
 <header id="topbar">
   <span class="logo">ChariMiru</span>
+  <button id="btnVoice" class="ride-only" title="音声案内">🔊</button>
+  <button id="btn3d" class="ride-only txt" title="2D／3D">2D</button>
   <button id="btnLocate" title="現在地">◎</button>
   <button id="btnSettings" title="設定">⚙</button>
 </header>
@@ -35,6 +37,7 @@
       <button id="btnSwap">⇅ 入れ替え</button>
       <button id="btnSearch" class="primary" hidden>再検索</button>
     </div>
+    <button id="btnFreeRide" class="free-ride">▶ ルートなしで走る（記録だけ）</button>
   </div>
 
   <div id="msg"></div>
@@ -52,7 +55,8 @@
     <div id="speedNote" class="hint detail-only"></div>
     <canvas id="profile"></canvas>
     <div class="sum-btns">
-      <button id="btnEdit">✎ 地点を変える</button>
+      <button id="btnRide" class="go">▶ 走る</button>
+      <button id="btnEdit">✎ 変更</button>
       <button id="btnShare">共有</button>
       <button id="btnDetail">詳しく ▾</button>
     </div>
@@ -60,9 +64,30 @@
     <div id="legend" class="legend detail-only"></div>
   </div>
 
+  <!-- 走行中の画面 -->
+  <div id="rideArea">
+    <div class="ride-speed"><span id="rdSpd">--</span><small>km/h</small></div>
+    <div class="ride-grid">
+      <div><span class="label">走行時間</span><span id="rdTime">0:00:00</span></div>
+      <div><span class="label">距離</span><span id="rdDist">0.00 km</span></div>
+      <div><span class="label">平均</span><span id="rdAvg">--</span></div>
+      <div class="route-only"><span class="label">残り</span><span id="rdRem"></span></div>
+      <div class="route-only"><span class="label">到着予定</span><span id="rdEta"></span></div>
+      <div><span class="label">登り</span><span id="rdUp">0 m</span></div>
+    </div>
+    <div id="rdClimb" class="ride-climb route-only"></div>
+    <canvas id="rideProfile" class="route-only"></canvas>
+    <div id="rdStatus" class="ride-status"></div>
+    <div id="rdNote" class="hint"></div>
+    <div class="ride-btns">
+      <button id="btnPause">⏸ 一時停止</button>
+      <button id="btnFinish" class="danger">■ 終了</button>
+    </div>
+  </div>
+
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版3）</span>
+    <span class="ver">段階1 試作（版4）</span>
   </footer>
 </section>
 
@@ -86,6 +111,15 @@
     <button class="wide-btn" data-pick="via">経由地に追加</button>
     <button class="wide-btn" data-pick="goal">目的地にする</button>
     <button class="close" data-close>キャンセル</button>
+  </div>
+</div>
+
+<!-- 走り終わったとき -->
+<div id="doneModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">おつかれさまでした</div>
+    <div id="doneBody"></div>
+    <button class="close" data-close>閉じる</button>
   </div>
 </div>
 
@@ -115,7 +149,8 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=3"></script>
-<script src="app.js?v=3"></script>
+<script src="config.js?v=4"></script>
+<script src="app.js?v=4"></script>
+<script src="ride.js?v=4"></script>
 </body>
 </html>

@@ -84,6 +84,8 @@ function saveSettings() {
   } catch (e) { /* 無視 */ }
 }
 
+let riding = false; // 走行中か（ride.js が切り替える）
+
 const keysOk = !!(CONFIG.MAPBOX_TOKEN && !CONFIG.MAPBOX_TOKEN.includes('ここに') &&
                   CONFIG.ORS_KEY && !CONFIG.ORS_KEY.includes('ここに'));
 
@@ -153,7 +155,7 @@ function updateMarkers() {
     const el = document.createElement('div');
     el.className = 'mk ' + (i === 0 ? 'mk-s' : i === n - 1 ? 'mk-g' : 'mk-v');
     el.textContent = i === 0 ? 'S' : i === n - 1 ? 'G' : String(i);
-    const m = new mapboxgl.Marker({ element: el, draggable: true }).setLngLat([p.lng, p.lat]).addTo(map);
+    const m = new mapboxgl.Marker({ element: el, draggable: !riding }).setLngLat([p.lng, p.lat]).addTo(map);
     m.on('dragend', () => {
       const ll = m.getLngLat();
       setPoint(state.points.indexOf(p), ll.lng, ll.lat, null);
@@ -237,6 +239,7 @@ async function searchPlaces(q) {
 
 // ---------- 地点の指定 ----------
 function setPoint(i, lng, lat, name) {
+  if (riding) return; // 走行中は地点を変えない
   const p = state.points[i];
   if (!p) return;
   p.lng = lng; p.lat = lat;
@@ -387,7 +390,7 @@ $('#btnUseHere').addEventListener('click', async () => {
 let pressTimer = null, pressPoint = null;
 function cancelPress() { clearTimeout(pressTimer); pressTimer = null; pressPoint = null; }
 function openPick(lngLat) {
-  if (!$('#pickModal').hidden) return;
+  if (riding || !$('#pickModal').hidden) return;
   state.pickLngLat = lngLat;
   openModal('#pickModal');
 }
@@ -425,6 +428,7 @@ document.querySelectorAll('[data-pick]').forEach(b => {
 
 // 現在地ボタン
 $('#btnLocate').addEventListener('click', async () => {
+  if (riding) { rideRecenter(); return; } // 走行中は「現在地を追いかける」に戻す
   try {
     const h = await getHere();
     showHere(h);
@@ -488,6 +492,7 @@ async function orsRoute(profile, body) {
 }
 
 async function searchRoute() {
+  if (riding) return;
   if (!canSearch()) { msg('出発地と目的地を指定してください', true); return; }
   if (!mapReady) { pendingSearch = true; return; }
   if (!keysOk) { msg('config.js にキーを設定してください', true); return; }
@@ -523,7 +528,7 @@ async function searchRoute() {
       return;
     }
   }
-  if (seq !== searchSeq) return; // より新しい検索が始まっていたら捨てる
+  if (seq !== searchSeq || riding) return; // より新しい検索が始まった・走行が始まったら捨てる
 
   try {
     showRoute(j);
@@ -649,9 +654,9 @@ function updateResult() {
 }
 
 // ---------- 坂の断面図 ----------
-function drawProfile(cursorIdx) {
+function drawProfile(cursorIdx, cvArg) {
   const r = state.route;
-  const cv = $('#profile');
+  const cv = cvArg || $('#profile');
   if (!r || cv.clientWidth === 0) return;
   const dpr = window.devicePixelRatio || 1;
   const W = cv.clientWidth, H = cv.clientHeight;
@@ -718,7 +723,7 @@ function drawProfile(cursorIdx) {
     ctx.fillStyle = cssVar('--fg');
     ctx.fill();
   }
-  r.geom = { padL, padR, W };
+  if (!cvArg) r.geom = { padL, padR, W };
 }
 
 function onProfile(e) {
@@ -785,6 +790,7 @@ function setMode(mode, opts = {}) {
   const pn = $('#panel');
   pn.classList.toggle('mode-result', mode === 'result');
   pn.classList.toggle('mode-edit', mode === 'edit');
+  pn.classList.toggle('mode-ride', mode === 'ride');
   pn.classList.remove('collapsed');
   if (mode === 'result') pn.classList.toggle('detail', !!opts.detail);
   $('#btnBackResult').hidden = !(mode === 'edit' && state.route);
@@ -807,7 +813,7 @@ $('#btnDetail').addEventListener('click', toggleDetail);
 $('#panelHandle').addEventListener('click', () => {
   const pn = $('#panel');
   if (pn.classList.contains('mode-result')) toggleDetail();
-  else pn.classList.toggle('collapsed');
+  else if (pn.classList.contains('mode-edit')) pn.classList.toggle('collapsed');
 });
 
 if (window.ResizeObserver) {
