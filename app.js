@@ -508,14 +508,14 @@ async function fetchRoute(coordinates) {
   const bike = BIKES[state.bike];
   const preference = state.pref === 'fast' ? 'fastest' : 'recommended';
   const full = {
-    coordinates, elevation: true, instructions: false, preference,
+    coordinates, elevation: true, instructions: true, preference,
     options: { avoid_features: ['steps', 'ferries'] }
   };
   if (state.pref === 'flat') full.options.profile_params = { weightings: { steepness_difficulty: 0 } };
   try {
     return { j: await orsRoute(bike.profile, full), note: '' };
   } catch (e1) {
-    const j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: false, preference });
+    const j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: true, preference });
     return { j, note: '※一部の条件（坂を避ける・階段を避ける等）を外して検索しました' };
   }
 }
@@ -603,6 +603,39 @@ function finishSamples(out) {
   });
 }
 
+// 曲がり角の種類（OpenRouteServiceの番号）→ 読み上げる言葉と矢印
+const TURN = {
+  0: ['左へ', '↰'], 1: ['右へ', '↱'], 2: ['大きく左へ', '↰'], 3: ['大きく右へ', '↱'],
+  4: ['斜め左へ', '↖'], 5: ['斜め右へ', '↗'], 7: ['ロータリーへ', '⟲'], 8: ['ロータリーを出ます', '⟲'],
+  9: ['Uターン', '↶'], 12: ['左側の道へ', '↖'], 13: ['右側の道へ', '↗']
+};
+
+// 検索していない道筋（記録・GPX）は、道の向きの変わり方から大きな曲がり角を見つける
+function deriveTurns(samples) {
+  const out = [];
+  const brg = (a, b) => {
+    const r = Math.PI / 180;
+    const y = Math.sin((b.lng - a.lng) * r) * Math.cos(b.lat * r);
+    const x = Math.cos(a.lat * r) * Math.sin(b.lat * r) - Math.sin(a.lat * r) * Math.cos(b.lat * r) * Math.cos((b.lng - a.lng) * r);
+    return Math.atan2(y, x) / r;
+  };
+  const K = 2; // 前後40m
+  let best = null;
+  for (let i = K; i < samples.length - K; i++) {
+    let dlt = brg(samples[i], samples[i + K]) - brg(samples[i - K], samples[i]);
+    dlt = ((dlt + 540) % 360) - 180;
+    if (Math.abs(dlt) >= 55) {
+      if (!best || Math.abs(dlt) > Math.abs(best.dlt)) best = { i, dlt };
+    } else if (best && i - best.i > K) {
+      out.push(best);
+      best = null;
+    }
+  }
+  if (best) out.push(best);
+  return out.filter((t, k) => k === 0 || samples[t.i].d - samples[out[k - 1].i].d > 60)
+    .map(t => ({ d: samples[t.i].d, type: Math.abs(t.dlt) > 150 ? 9 : t.dlt > 0 ? (t.dlt > 120 ? 3 : 1) : (t.dlt < -120 ? 2 : 0), name: '' }));
+}
+
 // ルートの線（[経度, 緯度, 標高] の並び）から、表示に使う形を作る
 async function makeRoute(f, useGsi) {
   const coords = f.geometry.coordinates;
@@ -621,7 +654,18 @@ async function makeRoute(f, useGsi) {
   }
   samples.forEach(s => { maxUp = Math.max(maxUp, s.g); maxDown = Math.min(maxDown, s.g); });
   const props = f.properties || {};
+  // 曲がり角（検索したルートはORSの案内、道筋だけのものは向きの変わり方から）
+  let steps = [];
+  if (Array.isArray(props.segments)) {
+    props.segments.forEach(sg => (sg.steps || []).forEach(st => {
+      if (!TURN[st.type] || !st.way_points) return;
+      steps.push({ d: cum[Math.min(st.way_points[0], cum.length - 1)], type: st.type, name: st.name && st.name !== '-' ? st.name : '' });
+    }));
+  } else {
+    steps = deriveTurns(samples);
+  }
   return {
+    steps,
     coords, samples, total, cum, elevSrc,
     dist: (props.summary && props.summary.distance) || total,
     ascent: up, descent: down, maxUp, maxDown,

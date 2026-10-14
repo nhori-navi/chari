@@ -230,6 +230,9 @@ body.ride-full #topbar #btnVoice{margin-left:auto}
 #panel.mode-ride.ride-full #rideBar{display:none}
 #rideBar{display:flex;align-items:center;gap:8px}
 .rb-text{flex:1 1 auto;min-width:0;cursor:pointer}
+#rbTurn{font-size:18px;font-weight:800;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+#rbTurn:empty,#rdTurn:empty{display:none}
+.ride-turn{font-size:18px;font-weight:800;color:var(--accent);margin:8px 2px 0}
 #rbLine1{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
 #rbLine2{font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rb-btn{

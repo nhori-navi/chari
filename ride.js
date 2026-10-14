@@ -169,7 +169,37 @@ function prepRoute() {
     const len = b.d - a.d, gain = b.es - a.es;
     return { start: a.d, end: b.d, len, gain, avg: len > 0 ? gain / len * 100 : 0, spoken: false };
   }).filter(c => c.len >= 200 && c.gain >= 10);
-  rr = { S, total: r.total, cumUp, totalUp: cumUp[cumUp.length - 1], climbs, end: S[S.length - 1] };
+  const steps = (r.steps || []).map(s => ({ ...s, saidFar: false, saidNear: false }));
+  rr = { S, total: r.total, cumUp, totalUp: cumUp[cumUp.length - 1], climbs, steps, end: S[S.length - 1] };
+}
+
+// ---------- 曲がり角の案内 ----------
+function nextTurn(prog) {
+  if (!rr || !rr.steps) return null;
+  return rr.steps.find(s => s.d > prog - 10) || null;
+}
+function turnWords(s) { return TURN[s.type] ? TURN[s.type][0] : ''; }
+function turnText(s, prog) {
+  const dist = Math.max(0, s.d - prog);
+  return `${TURN[s.type][1]} ${fmtM(dist)} ${turnWords(s)}${s.name ? '（' + s.name + '）' : ''}`;
+}
+function checkTurnVoice(prog) {
+  const s = nextTurn(prog);
+  if (!s) return;
+  const dist = s.d - prog;
+  // 速いほど早めに案内（15秒前。150〜300mの間）
+  const far = Math.min(300, Math.max(150, ride.spd / 3.6 * 15));
+  if (!s.saidFar && dist <= far && dist > 60) {
+    s.saidFar = true;
+    speak(`${Math.max(50, Math.round(dist / 50) * 50)}メートル先、${turnWords(s)}${s.name ? '。' + s.name : ''}`);
+  }
+  if (!s.saidNear && dist <= 35) {
+    s.saidNear = true;
+    s.saidFar = true;
+    const after = rr.steps[rr.steps.indexOf(s) + 1];
+    const soon = after && after.d - s.d < 100 ? `。すぐ${turnWords(after)}` : '';
+    speak(`まもなく${turnWords(s)}${soon}`);
+  }
 }
 
 function climbText(prog) {
@@ -438,6 +468,7 @@ function onFix(p) {
     onSample = updProgress(pos, acc, gap, t);
     if (onSample) {
       const prog = onSample.d;
+      checkTurnVoice(prog);
       checkClimbVoice(prog);
       if (!ride.arrived && rr.total - prog < 60 && haversine(pos, [rr.end.lng, rr.end.lat]) < 50) {
         ride.arrived = true;
@@ -508,6 +539,10 @@ function renderHud() {
     $('#rdRem').textContent = (rem / 1000).toFixed(1) + ' km';
     $('#rdEta').textContent = fmtClock(new Date(Date.now() + min * 60000));
     $('#rdClimb').textContent = climbText(prog);
+    const nt = nextTurn(prog);
+    const tt = nt && nt.d - prog <= 2000 && !r.offRoute ? turnText(nt, prog) : '';
+    $('#rbTurn').textContent = tt;
+    $('#rdTurn').textContent = tt;
     $('#rbLine1').textContent = `残り ${(rem / 1000).toFixed(1)}km｜到着 ${$('#rdEta').textContent}`;
     $('#rbLine2').textContent = climbText(prog);
     if ($('#panel').classList.contains('ride-full')) drawProfile(r.progIdx, $('#rideProfile'));

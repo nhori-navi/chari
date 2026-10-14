@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=8" rel="stylesheet">
+<link href="style.css?v=9" rel="stylesheet">
 </head>
 <body>
 
@@ -82,6 +82,7 @@
     <!-- 小さい表示（初めはこちら） -->
     <div id="rideBar">
       <div class="rb-text" title="タップで詳しく">
+        <div id="rbTurn" class="route-only"></div>
         <div id="rbLine1"></div>
         <div id="rbLine2" class="route-only"></div>
       </div>
@@ -99,6 +100,7 @@
       <div class="route-only"><span class="label">到着予定</span><span id="rdEta"></span></div>
       <div><span class="label">登り</span><span id="rdUp">0 m</span></div>
     </div>
+    <div id="rdTurn" class="ride-turn route-only"></div>
     <div id="rdClimb" class="ride-climb route-only"></div>
     <canvas id="rideProfile" class="route-only"></canvas>
     <div id="rdStatus" class="ride-status"></div>
@@ -113,7 +115,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版8）</span>
+    <span class="ver">段階1 試作（版9）</span>
   </footer>
 </section>
 
@@ -218,11 +220,11 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=8"></script>
-<script src="elev.js?v=8"></script>
-<script src="app.js?v=8"></script>
-<script src="ride.js?v=8"></script>
-<script src="hist.js?v=8"></script>
-<script src="journey.js?v=8"></script>
+<script src="config.js?v=9"></script>
+<script src="elev.js?v=9"></script>
+<script src="app.js?v=9"></script>
+<script src="ride.js?v=9"></script>
+<script src="hist.js?v=9"></script>
+<script src="journey.js?v=9"></script>
 </body>
 </html>
