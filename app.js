@@ -100,7 +100,7 @@ const map = new mapboxgl.Map({
 });
 map.addControl(new mapboxgl.AttributionControl({
   compact: true,
-  customAttribution: 'ルート: © openrouteservice.org / © OpenStreetMap contributors'
+  customAttribution: 'ルート: © openrouteservice.org / © OpenStreetMap contributors / 標高: 国土地理院'
 }));
 map.dragRotate.disable();
 map.touchZoomRotate.disableRotation();
@@ -439,10 +439,17 @@ $('#btnLocate').addEventListener('click', async () => {
 });
 
 // ---------- 設定 ----------
+// 平地の速さ：設定した値 → 履歴から学んだ値 → 自転車の種類の標準 の順に使う
+function planSpeed() {
+  const b = BIKES[state.bike];
+  if (state.avgSpeed) return { v: state.avgSpeed, src: '設定' };
+  if (state.learned && state.learned[state.bike]) return { v: state.learned[state.bike].v, src: '履歴から' };
+  return { v: b.speed, src: '標準' };
+}
 function renderCond() {
   const b = BIKES[state.bike];
-  const sp = state.avgSpeed || b.speed;
-  $('#condLine').innerHTML = `<b>${b.name}</b>・${PREFS[state.pref]}・平均${sp}km/h　<span>変更 ›</span>`;
+  const ps = planSpeed();
+  $('#condLine').innerHTML = `<b>${b.name}</b>・${PREFS[state.pref]}・平均${ps.v.toFixed(ps.src === '履歴から' ? 1 : 0)}km/h${ps.src === '履歴から' ? '（履歴）' : ''}　<span>変更 ›</span>`;
 }
 
 function openSettings() {
@@ -451,6 +458,11 @@ function openSettings() {
   $('#prefOpts').innerHTML = Object.entries(PREFS).map(([k, name]) =>
     `<label><input type="radio" name="pref" value="${k}" ${k === state.pref ? 'checked' : ''}>${name}</label>`).join('');
   $('#speedInput').value = state.avgSpeed || '';
+  const L = state.learned || {};
+  const lines = Object.entries(BIKES).filter(([k]) => L[k]).map(([k, b]) => `${b.name} ${L[k].v.toFixed(1)}km/h（最近${L[k].n}回の記録から）`);
+  $('#learnedNote').textContent = lines.length
+    ? '履歴から計算した平地の速さ：' + lines.join('、') + '。空欄にするとこちらを使います'
+    : '同じ自転車の種類で10分以上の記録が2回たまると、自分の速さを計算して使います';
   openModal('#settingsModal');
 }
 $('#btnSettings').addEventListener('click', openSettings);
@@ -491,6 +503,23 @@ async function orsRoute(profile, body) {
   return j;
 }
 
+// ORSにルートを頼む（細かい条件が通らなければ条件を外してもう一度）
+async function fetchRoute(coordinates) {
+  const bike = BIKES[state.bike];
+  const preference = state.pref === 'fast' ? 'fastest' : 'recommended';
+  const full = {
+    coordinates, elevation: true, instructions: false, preference,
+    options: { avoid_features: ['steps', 'ferries'] }
+  };
+  if (state.pref === 'flat') full.options.profile_params = { weightings: { steepness_difficulty: 0 } };
+  try {
+    return { j: await orsRoute(bike.profile, full), note: '' };
+  } catch (e1) {
+    const j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: false, preference });
+    return { j, note: '※一部の条件（坂を避ける・階段を避ける等）を外して検索しました' };
+  }
+}
+
 async function searchRoute() {
   if (riding) return;
   if (!canSearch()) { msg('出発地と目的地を指定してください', true); return; }
@@ -501,38 +530,30 @@ async function searchRoute() {
   $('#btnSearch').hidden = true;
   msg('ルートを検索中…');
   const pts = state.points.filter(p => p.lng != null);
-  const bike = BIKES[state.bike];
-  const coordinates = pts.map(p => [p.lng, p.lat]);
-  const preference = state.pref === 'fast' ? 'fastest' : 'recommended';
-
-  const full = {
-    coordinates, elevation: true, instructions: false, preference,
-    options: { avoid_features: ['steps', 'ferries'] }
-  };
-  if (state.pref === 'flat') full.options.profile_params = { weightings: { steepness_difficulty: 0 } };
-
-  let j, note = '';
+  let res;
   try {
-    j = await orsRoute(bike.profile, full);
-  } catch (e1) {
-    // 細かい条件が受け付けられなかった場合に備え、最小限の条件でもう一度
-    try {
-      j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: false, preference });
-      note = '※一部の条件（坂を避ける・階段を避ける等）を外して検索しました';
-    } catch (e2) {
-      if (seq === searchSeq) {
-        msg('ルートが見つかりませんでした：' + e2.message, true);
-        setMode('edit');
-        $('#btnSearch').hidden = false; // 失敗したときだけ「再検索」を出す
-      }
-      return;
+    res = await fetchRoute(pts.map(p => [p.lng, p.lat]));
+  } catch (e2) {
+    if (seq === searchSeq) {
+      msg('ルートが見つかりませんでした：' + e2.message, true);
+      setMode('edit');
+      $('#btnSearch').hidden = false; // 失敗したときだけ「再検索」を出す
     }
+    return;
   }
   if (seq !== searchSeq || riding) return; // より新しい検索が始まった・走行が始まったら捨てる
 
   try {
-    showRoute(j);
-    msg(note);
+    const f = res.j.features && res.j.features[0];
+    if (!f) throw new Error('結果が空でした');
+    msg('坂の高さを調べています…');
+    const route = await makeRoute(f, true);
+    if (seq !== searchSeq || riding) return;
+    route.wpPts = pts.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
+    showRoute(route);
+    const notes = [res.note];
+    if (route.elevSrc !== 'gsi') notes.push('※国土地理院の標高が取れなかったため、坂は粗いデータで表示しています');
+    msg(notes.filter(Boolean).join(' '));
   } catch (e) {
     msg('ルートの表示に失敗しました：' + e.message, true);
   }
@@ -563,21 +584,49 @@ function buildSamples(coords) {
   }
   const last = coords[coords.length - 1];
   if (!out.length || out[out.length - 1].d < total) out.push({ d: total, lng: last[0], lat: last[1], e: last[2] ?? 0 });
+  finishSamples(out);
+  return { samples: out, total, cum };
+}
 
-  // 標高のでこぼこをならす（前後40m）
+// 標高のでこぼこをならし（前後40m）、100mの幅で勾配（%）を出す
+function finishSamples(out) {
   out.forEach((s, i) => {
     let sum = 0, c = 0;
     for (let k = i - 2; k <= i + 2; k++) if (k >= 0 && k < out.length) { sum += out[k].e; c++; }
     s.es = sum / c;
   });
-  // 100mの幅で勾配（%）
   out.forEach((s, i) => {
     const k = Math.min(out.length - 1, i + WIN);
     const k0 = Math.max(0, k - WIN);
     const dd = out[k].d - out[k0].d;
     s.g = dd > 30 ? (out[k].es - out[k0].es) / dd * 100 : 0;
   });
-  return { samples: out, total, cum };
+}
+
+// ルートの線（[経度, 緯度, 標高] の並び）から、表示に使う形を作る
+async function makeRoute(f, useGsi) {
+  const coords = f.geometry.coordinates;
+  if (!coords || coords.length < 2) throw new Error('ルートの点が足りません');
+  const { samples, total, cum } = buildSamples(coords);
+  let elevSrc = 'ors';
+  if (useGsi && typeof gsiFill === 'function') {
+    let ok = false;
+    try { ok = await gsiFill(samples); } catch (e) { ok = false; }
+    if (ok) { finishSamples(samples); elevSrc = 'gsi'; }
+  }
+  let up = 0, down = 0, maxUp = 0, maxDown = 0;
+  for (let i = 1; i < samples.length; i++) {
+    const de = samples[i].es - samples[i - 1].es;
+    if (de > 0) up += de; else down -= de;
+  }
+  samples.forEach(s => { maxUp = Math.max(maxUp, s.g); maxDown = Math.min(maxDown, s.g); });
+  const props = f.properties || {};
+  return {
+    coords, samples, total, cum, elevSrc,
+    dist: (props.summary && props.summary.distance) || total,
+    ascent: up, descent: down, maxUp, maxDown,
+    wpD: Array.isArray(props.way_points) ? props.way_points.map(i => cum[Math.min(i, cum.length - 1)]) : null
+  };
 }
 
 // 地図に描く線を、勾配の色ごとに区切る（元の道の形のまま）
@@ -596,37 +645,19 @@ function buildSegments(coords, cum, samples) {
   return { type: 'FeatureCollection', features: feats };
 }
 
-function showRoute(j) {
-  const f = j.features && j.features[0];
-  if (!f) throw new Error('結果が空でした');
-  const coords = f.geometry.coordinates;
-  const { samples, total, cum } = buildSamples(coords);
+function setRouteLayer(route) {
+  map.getSource('route').setData(buildSegments(route.coords, route.cum, route.samples));
+}
 
-  let up = 0, down = 0, maxUp = 0, maxDown = 0;
-  for (let i = 1; i < samples.length; i++) {
-    const de = samples[i].es - samples[i - 1].es;
-    if (de > 0) up += de; else down -= de;
-  }
-  samples.forEach(s => { maxUp = Math.max(maxUp, s.g); maxDown = Math.min(maxDown, s.g); });
-
-  const props = f.properties || {};
-  state.route = {
-    samples, total,
-    dist: (props.summary && props.summary.distance) || total,
-    ascent: props.ascent ?? up,
-    descent: props.descent ?? down,
-    maxUp, maxDown
-  };
-
-  map.getSource('route').setData(buildSegments(coords, cum, samples));
+function showRoute(route) {
+  state.route = route;
+  setRouteLayer(route);
   if (cursorMarker) cursorMarker.remove();
-
   updateResult();
   $('#profileInfo').textContent = 'グラフを指でなぞると、地図にその地点が出ます';
   setMode('result', { detail: innerWidth >= 760 });
-
   const b = new mapboxgl.LngLatBounds();
-  coords.forEach(c => b.extend([c[0], c[1]]));
+  route.coords.forEach(c => b.extend([c[0], c[1]]));
   map.fitBounds(b, { padding: fitPadding(), maxZoom: 16, duration: 600 });
 }
 
@@ -640,7 +671,8 @@ function updateResult() {
   const r = state.route;
   if (!r) return;
   const b = BIKES[state.bike];
-  const v = state.avgSpeed || b.speed;
+  const ps = planSpeed();
+  const v = ps.v;
   const min = r.dist / 1000 / v * 60 + r.ascent / 10 * b.climb;
   $('#rDist').textContent = (r.dist / 1000).toFixed(1) + ' km';
   $('#rTime').textContent = fmtDur(min);
@@ -650,7 +682,8 @@ function updateResult() {
   const sep = '<span class="sep">｜</span>';
   $('#sumLine').innerHTML =
     `<b>${(r.dist / 1000).toFixed(1)}km</b>${sep}${fmtDur(min)}${sep}到着 ${fmtClock(new Date(Date.now() + min * 60000))}${sep}↑${Math.round(r.ascent)}m`;
-  $('#speedNote').textContent = `${b.name}・平地 平均${v}km/h、登り10mごとに約${b.climb}分を足して計算`;
+  $('#speedNote').textContent = `${b.name}・平地 平均${v.toFixed(1)}km/h（${ps.src}）、登り10mごとに約${b.climb}分を足して計算` +
+    (r.elevSrc === 'gsi' ? '。標高は国土地理院（10mメッシュ）' : '');
 }
 
 // ---------- 坂の断面図 ----------
@@ -752,6 +785,10 @@ $('#legend').innerHTML = '上り坂：' + GRADES.map(g => `<span><i style="backg
 
 // ---------- 共有リンク ----------
 $('#btnShare').addEventListener('click', async () => {
+  if (state.route && state.route.fromTrack) {
+    msg('記録の道筋から作ったルートは、共有リンクにできません（GPXの書き出しを使ってください）', true);
+    return;
+  }
   const pts = state.points.filter(p => p.lng != null);
   const q = new URLSearchParams();
   q.set('p', pts.map(p => p.lng.toFixed(5) + ',' + p.lat.toFixed(5)).join(';'));
@@ -829,6 +866,11 @@ if (CONFIG.SERIES_TOP_URL) {
   const a = $('#seriesLink');
   a.href = CONFIG.SERIES_TOP_URL;
   a.hidden = false;
+}
+
+// ---------- ホーム画面アプリ用 ----------
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => { /* 登録できなくても普通に使える */ });
 }
 
 // ---------- 起動 ----------

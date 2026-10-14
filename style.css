@@ -263,6 +263,13 @@ body.riding .no-ride{display:none !important}
 .h-btns{display:flex;gap:6px;margin-top:8px}
 .h-btns button{flex:1 1 0;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
 .danger-t{color:#c0392b !important}
+.go-t{color:var(--accent) !important;font-weight:700;border-color:var(--accent) !important}
+.file-btn{cursor:pointer;color:var(--accent);font-weight:700}
+.toggle-btn{
+  display:block;margin:6px 0 0;padding:6px 10px;border-radius:16px;font-size:13px;
+  border:1px solid var(--line);background:var(--bg);color:var(--sub);
+}
+.toggle-btn.on{border-color:var(--accent);color:var(--accent);font-weight:700}
 .h-all{margin-top:8px}
 #histChip{
   position:fixed;left:50%;transform:translateX(-50%);

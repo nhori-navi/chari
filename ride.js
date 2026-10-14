@@ -23,14 +23,77 @@ let follow = true, lastLineDraw = 0;
 // 地図の向き：north＝北が上、heading＝進行方向が上、3d＝進行方向が上＋斜めから
 const VIEWS = ['north', 'heading', '3d'];
 const VIEW_LABEL = { north: '北↑', heading: '進↑', '3d': '3D' };
-let voiceOn = true, viewMode = 'north';
+let voiceOn = true, viewMode = 'north', autoReroute = true;
 try {
   const p = JSON.parse(localStorage.getItem(RIDE_PREFS) || '{}');
   voiceOn = p.voice !== false;
+  autoReroute = p.reroute !== false;
   viewMode = VIEWS.includes(p.view) ? p.view : (p.view3d ? '3d' : 'north');
 } catch (e) { /* 初期値のまま */ }
 function saveRidePrefs() {
-  try { localStorage.setItem(RIDE_PREFS, JSON.stringify({ voice: voiceOn, view: viewMode })); } catch (e) { /* 無視 */ }
+  try { localStorage.setItem(RIDE_PREFS, JSON.stringify({ voice: voiceOn, view: viewMode, reroute: autoReroute })); } catch (e) { /* 無視 */ }
+}
+
+// ---------- コンパス（止まっている・ゆっくりのときの向き） ----------
+const COMPASS_BELOW_KMH = 5; // これより遅いときはコンパス、速いときはGPSの移動の向き
+let compass = null, compassOn = false, lastRot = 0;
+
+function enableCompass() {
+  if (compassOn) return;
+  const listen = () => {
+    const ev = ('ondeviceorientationabsolute' in window) ? 'deviceorientationabsolute' : 'deviceorientation';
+    window.addEventListener(ev, onOrient, true);
+    compassOn = true;
+  };
+  try {
+    // iPhoneは、ボタンを押した直後に許可を求める必要がある
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(r => { if (r === 'granted') listen(); })
+        .catch(() => { /* 許可されなければGPSの向きだけ使う */ });
+    } else if (typeof DeviceOrientationEvent !== 'undefined') {
+      listen();
+    }
+  } catch (e) { /* 使えない端末ではGPSの向きだけ */ }
+}
+
+function smoothAngle(a, b, k) {
+  const d = ((b - a + 540) % 360) - 180;
+  return (a + d * k + 360) % 360;
+}
+
+function onOrient(e) {
+  let h = null;
+  if (e.webkitCompassHeading != null && !isNaN(e.webkitCompassHeading)) h = e.webkitCompassHeading; // iPhone
+  else if (e.absolute && e.alpha != null) h = 360 - e.alpha; // Android
+  if (h == null) return;
+  const so = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+  h = (h + so + 360) % 360;
+  compass = compass == null ? h : smoothAngle(compass, h, 0.25);
+  if (ride && riding) onCompassTick();
+}
+
+// 今使う向き：走っていればGPSの移動の向き、遅ければコンパス
+function headingNow() {
+  if (!ride) return null;
+  if (ride.spd >= COMPASS_BELOW_KMH && ride.course != null) return ride.course;
+  if (compass != null) return compass;
+  return ride.course;
+}
+
+function onCompassTick() {
+  if (ride.spd >= COMPASS_BELOW_KMH) return;
+  if (rideMarker) rideMarker.setRotation(compass);
+  if (!follow || viewMode === 'north' || !ride.pos) return;
+  const now = Date.now();
+  if (now - lastRot < 250) return;
+  const diff = Math.abs(((compass - map.getBearing() + 540) % 360) - 180);
+  if (diff < 4) return; // 小さな揺れでは回さない
+  lastRot = now;
+  map.easeTo({
+    center: ride.pos, bearing: compass, pitch: viewMode === '3d' ? 60 : 0,
+    offset: camOffset(viewMode === '3d' ? 0.72 : 0.62), duration: 250
+  });
 }
 
 // ---------- 小さな道具 ----------
@@ -78,7 +141,7 @@ $('#rdToast').addEventListener('click', () => { if (!statusText) setNote(''); })
 function toggleRideFull() {
   const full = $('#panel').classList.toggle('ride-full');
   document.body.classList.toggle('ride-full', full);
-  if (ride) { renderHud(); if (follow && ride.last) moveCamera(ride.last); }
+  if (ride) { renderHud(); if (follow && ride.pos) moveCamera(ride.pos); }
 }
 $('#rideBar .rb-text').addEventListener('click', toggleRideFull);
 
@@ -133,7 +196,8 @@ function checkClimbVoice(prog) {
 }
 
 // ルート上のどこにいるか
-function updProgress(pos, acc, wide) {
+let rerouting = false, lastReroute = 0;
+function updProgress(pos, acc, wide, t) {
   const S = rr.S;
   const cosLat = Math.cos(pos[1] * Math.PI / 180);
   const from = (ride.offRoute || wide) ? 0 : Math.max(0, ride.progIdx - 50);
@@ -148,14 +212,92 @@ function updProgress(pos, acc, wide) {
   const lim = Math.max(OFF_ROUTE_M, Math.min(acc, 80));
   if (bd > lim) {
     ride.offCount++;
+    if (!ride.offSince) ride.offSince = t;
     if (ride.offCount >= 3 && !ride.offRoute) { ride.offRoute = true; speak('ルートから外れました'); }
+    if (ride.offRoute && autoReroute && !rerouting && t - ride.offSince >= 15000 && Date.now() - lastReroute > 30000) reroute(pos);
     return null;
   }
   if (ride.offRoute) speak('ルートに戻りました');
   ride.offRoute = false;
   ride.offCount = 0;
+  ride.offSince = null;
   ride.progIdx = best;
   return S[best];
+}
+
+async function reroute(pos) {
+  if (!ride || !state.route) return;
+  rerouting = true;
+  lastReroute = Date.now();
+  setStatus('ルートを引き直しています…');
+  try {
+    const prog = rr.S[ride.progIdx].d;
+    const wp = state.route.wpPts || [];
+    const wpD = state.route.wpD || [];
+    // まだ通っていない経由地と目的地
+    let rest = wp.filter((p, i) => i > 0 && (wpD[i] == null || wpD[i] > prog + 30));
+    if (!rest.length && wp.length) rest = [wp[wp.length - 1]];
+    const pts = [{ name: '現在地', lng: pos[0], lat: pos[1] }, ...rest];
+    const res = await fetchRoute(pts.map(p => [p.lng, p.lat]));
+    const f = res.j.features && res.j.features[0];
+    if (!f) throw new Error('結果が空でした');
+    const route = await makeRoute(f, true);
+    if (!ride) return;
+    route.wpPts = pts.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
+    state.route = route;
+    state.points = route.wpPts.map(p => ({ ...p }));
+    ride.points = state.points;
+    setRouteLayer(route);
+    renderPoints();
+    updateMarkers();
+    prepRoute();
+    ride.progIdx = 0;
+    ride.offRoute = false;
+    ride.offCount = 0;
+    ride.offSince = null;
+    ride.arrived = false;
+    speak('ルートを引き直しました');
+    renderHud();
+    persist();
+  } catch (e) {
+    setStatus('ルートを引き直せませんでした（通信を確認してください）', true);
+  } finally {
+    rerouting = false;
+  }
+}
+
+function updRerouteBtn() {
+  $('#btnReroute').textContent = '自動で引き直す：' + (autoReroute ? 'オン' : 'オフ');
+  $('#btnReroute').classList.toggle('on', autoReroute);
+}
+$('#btnReroute').addEventListener('click', () => {
+  autoReroute = !autoReroute;
+  saveRidePrefs();
+  updRerouteBtn();
+  speak(autoReroute ? 'ルートを外れたら自動で引き直します' : '自動の引き直しをオフにしました');
+});
+
+// ---------- 自分の速さを履歴から学ぶ ----------
+// 自転車の種類ごとに、走行時間10分以上の最近10回から「平地の速さ」を出す（登りにかかった分は差し引く）
+async function refreshLearned() {
+  let all = [];
+  try { all = await allRides(); } catch (e) { return; }
+  const out = {};
+  Object.keys(BIKES).forEach(k => {
+    const rs = all.filter(r => r.bike === k && r.movingMs >= 600000 && r.dist > 1000)
+      .sort((a, b) => b.start - a.start).slice(0, 10);
+    if (rs.length < 2) return;
+    let dist = 0, flatMs = 0;
+    rs.forEach(r => {
+      dist += r.dist;
+      flatMs += Math.max(r.movingMs * 0.5, r.movingMs - (r.up || 0) / 10 * BIKES[k].climb * 60000);
+    });
+    const v = dist / 1000 / (flatMs / 3600000);
+    if (v >= 6 && v <= 45) out[k] = { v, n: rs.length };
+  });
+  state.learned = out;
+  renderCond();
+  if (state.route && !riding) updateResult();
 }
 
 // ---------- 走行の開始 ----------
@@ -169,6 +311,7 @@ function startRide(withRoute) {
   if (withRoute && !state.route) withRoute = false;
   // iPhoneでは、最初の音声はボタンを押した直後に出す必要がある
   speak(withRoute ? 'ルート案内と記録を始めます' : '記録を始めます');
+  enableCompass();
   ride = {
     start: Date.now(), withRoute,
     routeName: withRoute ? routeLabel() : null,
@@ -201,6 +344,7 @@ function beginRide() {
   setStatus('GPSの電波を探しています…');
   updVoiceBtn();
   upd3dBtn();
+  updRerouteBtn();
   apply3d(true);
   startWatch();
   requestWake();
@@ -236,6 +380,7 @@ function onFix(p) {
   const c = p.coords, t = p.timestamp || Date.now();
   const pos = [c.longitude, c.latitude];
   const acc = c.accuracy || 999;
+  ride.pos = pos;
   showRidePos(pos);
 
   if (ride.paused) { ride.last = null; ride.prevFixT = t; ride.segBreak = true; renderHud(); return; }
@@ -290,7 +435,7 @@ function onFix(p) {
   // ルート上の位置
   let onSample = null;
   if (ride.withRoute && rr) {
-    onSample = updProgress(pos, acc, gap);
+    onSample = updProgress(pos, acc, gap, t);
     if (onSample) {
       const prog = onSample.d;
       checkClimbVoice(prog);
@@ -357,7 +502,7 @@ function renderHud() {
     const prog = rr.S[r.progIdx].d;
     const rem = Math.max(0, rr.total - prog);
     const b = BIKES[r.bike] || BIKES.cross;
-    const v = (avg && r.dist > 1000) ? avg : (state.avgSpeed || b.speed);
+    const v = (avg && r.dist > 1000) ? avg : planSpeed().v;
     const remUp = rr.totalUp - rr.cumUp[r.progIdx];
     const min = rem / 1000 / v * 60 + remUp / 10 * b.climb;
     $('#rdRem').textContent = (rem / 1000).toFixed(1) + ' km';
@@ -389,7 +534,8 @@ function showRidePos(pos) {
     rideMarker = new mapboxgl.Marker({ element: el, rotationAlignment: 'map', pitchAlignment: 'map' });
   }
   rideMarker.setLngLat(pos).addTo(map);
-  if (ride && ride.course != null) rideMarker.setRotation(ride.course);
+  const h = headingNow();
+  if (h != null) rideMarker.setRotation(h);
 }
 
 function ensureRideLayer() {
@@ -423,7 +569,8 @@ function camOffset(ratio) {
 }
 function moveCamera(pos) {
   if (!follow || !ride) return;
-  const brg = ride.course != null ? ride.course : map.getBearing();
+  const hn = headingNow();
+  const brg = hn != null ? hn : map.getBearing();
   if (viewMode === '3d') {
     map.easeTo({ center: pos, bearing: brg, pitch: 60, offset: camOffset(0.72), duration: 900 });
   } else if (viewMode === 'heading') {
@@ -435,7 +582,7 @@ function moveCamera(pos) {
 function rideRecenter() {
   follow = true;
   updFollowBtn();
-  if (ride && ride.last) moveCamera(ride.last);
+  if (ride && ride.pos) moveCamera(ride.pos);
 }
 function updFollowBtn() { $('#btnLocate').classList.toggle('on', follow && riding); }
 
@@ -457,11 +604,12 @@ function apply3d(first) {
     if (map.getLayer('bld3d')) map.setLayoutProperty('bld3d', 'visibility', viewMode === '3d' ? 'visible' : 'none');
   } catch (e) { /* 建物が出せなくても走行は続ける */ }
   const z = Math.max(map.getZoom(), viewMode === '3d' ? 16.5 : 15.5);
-  if (first || !ride || !ride.last) {
-    map.easeTo({ pitch: viewMode === '3d' ? 60 : 0, bearing: viewMode !== 'north' && ride && ride.course != null ? ride.course : 0, zoom: z, duration: 600 });
+  const hn = headingNow();
+  if (first || !ride || !ride.pos) {
+    map.easeTo({ pitch: viewMode === '3d' ? 60 : 0, bearing: viewMode !== 'north' && hn != null ? hn : 0, zoom: z, duration: 600 });
   } else {
     map.easeTo({ zoom: z, duration: 300 });
-    moveCamera(ride.last);
+    moveCamera(ride.pos);
   }
 }
 function upd3dBtn() {
@@ -473,6 +621,7 @@ function updVoiceBtn() {
 }
 
 $('#btn3d').addEventListener('click', () => {
+  enableCompass();
   viewMode = VIEWS[(VIEWS.indexOf(viewMode) + 1) % VIEWS.length];
   saveRidePrefs();
   speak({ north: '北が上', heading: '進行方向が上', '3d': '3D表示' }[viewMode]);
@@ -553,6 +702,7 @@ async function saveAndReport(rec, talk) {
   if (rec.dist < 50) { msg('走った距離が短いため、記録は保存しませんでした'); return; }
   try {
     await putRide(rec);
+    refreshLearned();
     const all = await allRides();
     const total = all.reduce((s, x) => s + (x.dist || 0), 0);
     showDone(rec, all.length, total);
@@ -655,3 +805,4 @@ $('#btnFreeRide').addEventListener('click', () => startRide(false));
 
 // 地図の準備ができたら、途中の記録がないか確かめる
 if (mapReady) checkResume(); else map.on('load', () => setTimeout(checkResume, 0));
+refreshLearned();
