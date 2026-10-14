@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#3d8b6e">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=5" rel="stylesheet">
+<link href="style.css?v=6" rel="stylesheet">
 </head>
 <body>
 
@@ -20,7 +20,8 @@
     <div class="rc-sub"><span id="rcDist">0.00 km</span>　<span id="rcTime">0:00:00</span></div>
   </div>
   <button id="btnVoice" class="ride-only" title="音声案内">🔊</button>
-  <button id="btn3d" class="ride-only txt" title="2D／3D">2D</button>
+  <button id="btn3d" class="ride-only txt" title="地図の向き">北↑</button>
+  <button id="btnHist" class="no-ride txt" title="走行の履歴">履歴</button>
   <button id="btnLocate" title="現在地">◎</button>
   <button id="btnSettings" title="設定">⚙</button>
 </header>
@@ -104,7 +105,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版5）</span>
+    <span class="ver">段階1 試作（版6）</span>
   </footer>
 </section>
 
@@ -128,6 +129,34 @@
     <button class="wide-btn" data-pick="via">経由地に追加</button>
     <button class="wide-btn" data-pick="goal">目的地にする</button>
     <button class="close" data-close>キャンセル</button>
+  </div>
+</div>
+
+<!-- 履歴の道筋を表示中の札 -->
+<div id="histChip" hidden><span id="histChipText"></span><button id="histChipClose" title="消す">×</button></div>
+
+<!-- 終了の確認 -->
+<div id="finishModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">走行を終わりますか？</div>
+    <button id="fSave" class="primary wide-btn">保存して終了</button>
+    <button id="fDiscard" class="wide-btn danger-t">保存せずに終了（この記録を捨てる）</button>
+    <button class="close" data-close>走行を続ける</button>
+  </div>
+</div>
+
+<!-- 履歴 -->
+<div id="histModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">走行の履歴</div>
+    <div id="histSum" class="stats three"></div>
+    <ul id="histList"></ul>
+    <div id="histAll" class="h-all">
+      <button id="btnGpxAll" class="wide-btn">全部をGPXで書き出す</button>
+      <button id="btnDelAll" class="wide-btn danger-t">全部削除</button>
+    </div>
+    <p class="hint">記録はこの端末（このブラウザ）の中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきGPXで書き出しておくと安心です。</p>
+    <button class="close" data-close>閉じる</button>
   </div>
 </div>
 
@@ -166,8 +195,9 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=5"></script>
-<script src="app.js?v=5"></script>
-<script src="ride.js?v=5"></script>
+<script src="config.js?v=6"></script>
+<script src="app.js?v=6"></script>
+<script src="ride.js?v=6"></script>
+<script src="hist.js?v=6"></script>
 </body>
 </html>

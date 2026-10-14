@@ -20,14 +20,17 @@ let ride = null;
 let watchId = null, wakeLock = null, rideTimer = null, rideMarker = null;
 let follow = true, lastLineDraw = 0;
 
-let voiceOn = true, view3d = false;
+// 地図の向き：north＝北が上、heading＝進行方向が上、3d＝進行方向が上＋斜めから
+const VIEWS = ['north', 'heading', '3d'];
+const VIEW_LABEL = { north: '北↑', heading: '進↑', '3d': '3D' };
+let voiceOn = true, viewMode = 'north';
 try {
   const p = JSON.parse(localStorage.getItem(RIDE_PREFS) || '{}');
   voiceOn = p.voice !== false;
-  view3d = !!p.view3d;
+  viewMode = VIEWS.includes(p.view) ? p.view : (p.view3d ? '3d' : 'north');
 } catch (e) { /* 初期値のまま */ }
 function saveRidePrefs() {
-  try { localStorage.setItem(RIDE_PREFS, JSON.stringify({ voice: voiceOn, view3d })); } catch (e) { /* 無視 */ }
+  try { localStorage.setItem(RIDE_PREFS, JSON.stringify({ voice: voiceOn, view: viewMode })); } catch (e) { /* 無視 */ }
 }
 
 // ---------- 小さな道具 ----------
@@ -420,8 +423,11 @@ function camOffset(ratio) {
 }
 function moveCamera(pos) {
   if (!follow || !ride) return;
-  if (view3d) {
-    map.easeTo({ center: pos, bearing: ride.course != null ? ride.course : map.getBearing(), pitch: 60, offset: camOffset(0.72), duration: 900 });
+  const brg = ride.course != null ? ride.course : map.getBearing();
+  if (viewMode === '3d') {
+    map.easeTo({ center: pos, bearing: brg, pitch: 60, offset: camOffset(0.72), duration: 900 });
+  } else if (viewMode === 'heading') {
+    map.easeTo({ center: pos, bearing: brg, pitch: 0, offset: camOffset(0.62), duration: 900 });
   } else {
     map.easeTo({ center: pos, bearing: 0, pitch: 0, offset: camOffset(0.5), duration: 900 });
   }
@@ -436,7 +442,7 @@ function updFollowBtn() { $('#btnLocate').classList.toggle('on', follow && ridin
 function apply3d(first) {
   if (!mapReady) return;
   try {
-    if (view3d && !map.getLayer('bld3d') && map.getSource('composite')) {
+    if (viewMode === '3d' && !map.getLayer('bld3d') && map.getSource('composite')) {
       map.addLayer({
         id: 'bld3d', type: 'fill-extrusion', source: 'composite', 'source-layer': 'building', minzoom: 15,
         filter: ['==', ['get', 'extrude'], 'true'],
@@ -448,27 +454,28 @@ function apply3d(first) {
         }
       }, 'route-casing');
     }
-    if (map.getLayer('bld3d')) map.setLayoutProperty('bld3d', 'visibility', view3d ? 'visible' : 'none');
+    if (map.getLayer('bld3d')) map.setLayoutProperty('bld3d', 'visibility', viewMode === '3d' ? 'visible' : 'none');
   } catch (e) { /* 建物が出せなくても走行は続ける */ }
-  const z = Math.max(map.getZoom(), view3d ? 16.5 : 15.5);
+  const z = Math.max(map.getZoom(), viewMode === '3d' ? 16.5 : 15.5);
   if (first || !ride || !ride.last) {
-    map.easeTo({ pitch: view3d ? 60 : 0, bearing: view3d && ride && ride.course != null ? ride.course : 0, zoom: z, duration: 600 });
+    map.easeTo({ pitch: viewMode === '3d' ? 60 : 0, bearing: viewMode !== 'north' && ride && ride.course != null ? ride.course : 0, zoom: z, duration: 600 });
   } else {
     map.easeTo({ zoom: z, duration: 300 });
     moveCamera(ride.last);
   }
 }
 function upd3dBtn() {
-  $('#btn3d').textContent = view3d ? '3D' : '2D';
-  $('#btn3d').classList.toggle('on', view3d);
+  $('#btn3d').textContent = VIEW_LABEL[viewMode];
+  $('#btn3d').classList.toggle('on', viewMode !== 'north');
 }
 function updVoiceBtn() {
   $('#btnVoice').textContent = voiceOn ? '🔊' : '🔇';
 }
 
 $('#btn3d').addEventListener('click', () => {
-  view3d = !view3d;
+  viewMode = VIEWS[(VIEWS.indexOf(viewMode) + 1) % VIEWS.length];
   saveRidePrefs();
+  speak({ north: '北が上', heading: '進行方向が上', '3d': '3D表示' }[viewMode]);
   upd3dBtn();
   follow = true;
   updFollowBtn();
@@ -515,9 +522,16 @@ function toRecord(r, endT) {
   };
 }
 
-async function finishRide(ask) {
+function finishRide(ask) {
   if (!ride) return;
-  if (ask && !confirm('記録を終了して保存しますか？')) return;
+  if (ask) { openModal('#finishModal'); return; }
+  endRide(true);
+}
+$('#fSave').addEventListener('click', () => { closeModals(); endRide(true); });
+$('#fDiscard').addEventListener('click', () => { closeModals(); endRide(false); });
+
+async function endRide(save) {
+  if (!ride) return;
   stopHardware();
   const rec = toRecord(ride, Date.now());
   ride = null;
@@ -531,6 +545,7 @@ async function finishRide(ask) {
   map.easeTo({ pitch: 0, bearing: 0, duration: 500 });
   updateMarkers();
   setMode(state.route ? 'result' : 'edit');
+  if (!save) { speak('記録を保存せずに終了しました'); msg('記録を保存せずに終了しました'); return; }
   await saveAndReport(rec, true);
 }
 
