@@ -312,6 +312,36 @@ body.journey #panel,body.journey #histChip,body.journey #topbar button{display:n
 }
 .toggle-btn.on{border-color:var(--accent);color:var(--accent);font-weight:700}
 .h-all{margin-top:8px}
+#playChip{
+  position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(100px + env(safe-area-inset-top,0px));z-index:6;max-width:90vw;
+  display:flex;align-items:center;gap:6px;
+  background:var(--accent);color:#fff;border-radius:18px;padding:5px 6px 5px 12px;
+  font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+#playChip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#playChip button{flex:0 0 auto;border:none;background:rgba(255,255,255,.25);color:#fff;border-radius:50%;width:24px;height:24px}
+body.riding #playChip,body.journey #playChip{display:none !important}
+.tabs{display:flex;gap:4px;margin:0 0 10px;border-bottom:1px solid var(--line)}
+.tabs button{
+  flex:1 1 0;padding:8px 4px;border:none;background:none;color:var(--sub);
+  border-bottom:3px solid transparent;font-weight:700;
+}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.pass-sum{font-size:16px;font-weight:700;margin:4px 2px}
+#passList{list-style:none;margin:8px 0 0;padding:0}
+#passList li{padding:10px 6px;border-bottom:1px solid var(--line);cursor:pointer}
+#passList li.muted{color:var(--sub);cursor:default}
+.pass-mk{font-size:24px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}
+#monthChart{display:block;width:100%;height:150px;background:var(--bg);border:1px solid var(--line);border-radius:8px}
+#badgeGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px}
+.badge{border:1px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center;opacity:.45;filter:grayscale(1)}
+.badge.ok{opacity:1;filter:none;border-color:#e0b630;background:rgba(224,182,48,.10)}
+.b-icon{font-size:26px;line-height:1.1}
+.b-name{font-size:11px;font-weight:700;margin-top:4px}
+.b-sub{font-size:10px;color:var(--sub);margin-top:2px}
+.play-ev{margin-top:10px;padding:10px;border-radius:10px;background:rgba(61,139,110,.10);font-size:14px}
+.play-ev div{margin:3px 0}
 #histChip{
   position:fixed;left:50%;transform:translateX(-50%);
   top:calc(62px + env(safe-area-inset-top,0px));z-index:6;max-width:90vw;

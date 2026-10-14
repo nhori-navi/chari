@@ -747,6 +747,7 @@ async function saveAndReport(rec, talk) {
       // 旅の知らせ（多いときは最後の3つ）
       ev.slice(-3).forEach(x => speak(x.text.replace('🎉 ', '').replace('：', '、')));
     }
+    if (typeof afterSavePlay === 'function') afterSavePlay(rec, all); // マス・バッジ・峠の知らせ
   } catch (e) {
     msg('記録の保存に失敗しました：' + (e && e.message ? e.message : e), true);
   }

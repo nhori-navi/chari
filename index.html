@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=9" rel="stylesheet">
+<link href="style.css?v=10" rel="stylesheet">
 </head>
 <body>
 
@@ -115,7 +115,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版9）</span>
+    <span class="ver">段階1 試作（版10）</span>
   </footer>
 </section>
 
@@ -155,6 +155,9 @@
   <p class="hint">これまでの走行記録の合計距離で、短いコースから順に進みます。1つ制覇すると次のコースが開きます。距離は代表的な地点を結んだ目安です。</p>
 </section>
 
+<!-- マス・峠を表示中の札 -->
+<div id="playChip" hidden><span id="playChipText"></span><button id="playChipClose" title="消す">×</button></div>
+
 <!-- 履歴の道筋を表示中の札 -->
 <div id="histChip" hidden><span id="histChipText"></span><button id="histChipClose" title="消す">×</button></div>
 
@@ -172,6 +175,13 @@
 <div id="histModal" class="modal" hidden>
   <div class="sheet">
     <div class="sheet-title">走行の履歴</div>
+    <div id="histTabs" class="tabs">
+      <button data-tab="list" class="on">一覧</button>
+      <button data-tab="mesh">マス</button>
+      <button data-tab="pass">峠</button>
+      <button data-tab="stats">記録</button>
+    </div>
+    <div id="tab-list" class="tab-pane">
     <div id="histSum" class="stats three"></div>
     <ul id="histList"></ul>
     <label class="wide-btn file-btn">GPXファイルを読み込む（コース・記録）<input type="file" id="gpxFile" hidden></label>
@@ -180,6 +190,29 @@
       <button id="btnDelAll" class="wide-btn danger-t">全部削除</button>
     </div>
     <p class="hint">記録はこの端末（このブラウザ）の中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきGPXで書き出しておくと安心です。</p>
+    </div>
+
+    <div id="tab-mesh" class="tab-pane" hidden>
+      <div id="meshSum" class="stats three"></div>
+      <button id="btnMeshMap" class="wide-btn go-t">塗ったマスを地図で見る</button>
+      <p class="hint">走った道筋が通った約1km四方のマスを塗っていきます（国の統計で使われる「標準地域メッシュ」と同じ区切り）。画面が消えていた間など、道筋が途切れた所は塗りません。</p>
+    </div>
+
+    <div id="tab-pass" class="tab-pane" hidden>
+      <div id="passSum" class="pass-sum"></div>
+      <button id="btnPassScan" class="wide-btn" hidden>過去の記録も調べる</button>
+      <ul id="passList" class="h-list"></ul>
+      <p class="hint">地図データ（OpenStreetMap）に名前つきで登録されている峠を、走った道筋が50m以内で通るとスタンプが押されます。走り終わって保存したあとに通信して調べます。</p>
+    </div>
+
+    <div id="tab-stats" class="tab-pane" hidden>
+      <div id="statSum" class="stats"></div>
+      <div class="glabel" style="margin-top:12px">月ごとの距離（km）</div>
+      <canvas id="monthChart"></canvas>
+      <div id="badgeSum" class="glabel" style="margin-top:12px"></div>
+      <div id="badgeGrid"></div>
+    </div>
+
     <button class="close" data-close>閉じる</button>
   </div>
 </div>
@@ -220,11 +253,12 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=9"></script>
-<script src="elev.js?v=9"></script>
-<script src="app.js?v=9"></script>
-<script src="ride.js?v=9"></script>
-<script src="hist.js?v=9"></script>
-<script src="journey.js?v=9"></script>
+<script src="config.js?v=10"></script>
+<script src="elev.js?v=10"></script>
+<script src="app.js?v=10"></script>
+<script src="ride.js?v=10"></script>
+<script src="hist.js?v=10"></script>
+<script src="journey.js?v=10"></script>
+<script src="play.js?v=10"></script>
 </body>
 </html>
