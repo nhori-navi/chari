@@ -150,6 +150,26 @@ button{font:inherit;color:inherit;cursor:pointer}
   border:1px solid var(--accent);background:var(--bg);color:var(--accent);font-weight:700;
 }
 
+/* 結果モード */
+#panel.mode-edit #result{display:none}
+#panel.mode-result #editArea{display:none}
+#panel.mode-result:not(.detail) .detail-only{display:none !important}
+#panel.mode-result:not(.detail) #profile{height:96px}
+.sum-line{font-size:14px;margin:0 2px 8px;line-height:1.5}
+.sum-line b{font-size:19px;color:var(--accent)}
+.sum-line .sep{color:var(--line);margin:0 4px}
+.sum-btns{display:flex;gap:6px;margin-bottom:4px}
+.sum-btns button{
+  flex:1 1 auto;padding:9px 6px;border-radius:8px;
+  border:1px solid var(--line);background:var(--bg);font-size:14px;
+}
+#btnShare{border-color:var(--accent);color:var(--accent);font-weight:700}
+.back{
+  display:block;width:100%;margin:0 0 8px;padding:9px;text-align:left;
+  border:1px solid var(--accent);border-radius:8px;background:var(--bg);
+  color:var(--accent);font-weight:700;
+}
+
 #footer{
   display:flex;justify-content:space-between;align-items:center;
   margin-top:12px;font-size:12px;color:var(--sub);

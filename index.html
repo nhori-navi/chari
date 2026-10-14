@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#3d8b6e">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css" rel="stylesheet">
+<link href="style.css?v=2" rel="stylesheet">
 </head>
 <body>
 
@@ -19,39 +19,50 @@
   <button id="btnSettings" title="設定">⚙</button>
 </header>
 
-<section id="panel">
+<section id="panel" class="mode-edit">
   <div id="panelHandle" title="パネルを縮める／広げる"></div>
 
-  <button id="condLine" class="cond"></button>
+  <!-- 地点を指定する画面 -->
+  <div id="editArea">
+    <button id="btnBackResult" class="back" hidden>‹ ルートの表示に戻る</button>
 
-  <div id="points"></div>
+    <button id="condLine" class="cond"></button>
 
-  <div class="row-actions">
-    <button id="btnAddVia">＋経由地</button>
-    <button id="btnSwap">⇅ 入れ替え</button>
-    <button id="btnSearch" class="primary">ルート検索</button>
+    <div id="points"></div>
+
+    <div class="row-actions">
+      <button id="btnAddVia">＋経由地</button>
+      <button id="btnSwap">⇅ 入れ替え</button>
+      <button id="btnSearch" class="primary">ルート検索</button>
+    </div>
   </div>
 
   <div id="msg"></div>
 
-  <div id="result" hidden>
-    <div class="stats">
+  <!-- ルートの結果（結果モード） -->
+  <div id="result">
+    <div id="sumLine" class="sum-line"></div>
+    <div class="sum-btns">
+      <button id="btnEdit">✎ 地点を変える</button>
+      <button id="btnShare">共有</button>
+      <button id="btnDetail">詳しく ▾</button>
+    </div>
+    <div class="stats detail-only">
       <div><span class="label">距離</span><span id="rDist"></span></div>
       <div><span class="label">所要時間（目安）</span><span id="rTime"></span></div>
       <div><span class="label">到着予定</span><span id="rEta"></span></div>
       <div><span class="label">登り／下り</span><span id="rClimb"></span></div>
       <div class="wide"><span class="label">最大勾配</span><span id="rGrade"></span></div>
     </div>
-    <div id="speedNote" class="hint"></div>
+    <div id="speedNote" class="hint detail-only"></div>
     <canvas id="profile"></canvas>
     <div id="profileInfo" class="hint">グラフを指でなぞると、地図にその地点が出ます</div>
     <div id="legend" class="legend"></div>
-    <button id="btnShare" class="share">共有リンクを作る</button>
   </div>
 
   <footer id="footer">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作</span>
+    <span class="ver">段階1 試作（版2）</span>
   </footer>
 </section>
 
@@ -104,7 +115,7 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js"></script>
-<script src="app.js"></script>
+<script src="config.js?v=2"></script>
+<script src="app.js?v=2"></script>
 </body>
 </html>

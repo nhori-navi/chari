@@ -532,7 +532,7 @@ function clearRoute() {
   state.route = null;
   searchSeq++;
   if (mapReady) map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
-  $('#result').hidden = true;
+  setMode('edit');
   if (cursorMarker) cursorMarker.remove();
 }
 
@@ -612,10 +612,8 @@ function showRoute(j) {
   if (cursorMarker) cursorMarker.remove();
 
   updateResult();
-  $('#result').hidden = false;
-  $('#panel').classList.remove('collapsed');
   $('#profileInfo').textContent = 'グラフを指でなぞると、地図にその地点が出ます';
-  drawProfile(null);
+  setMode('result', { detail: innerWidth >= 760 });
 
   const b = new mapboxgl.LngLatBounds();
   coords.forEach(c => b.extend([c[0], c[1]]));
@@ -639,6 +637,9 @@ function updateResult() {
   $('#rEta').textContent = fmtClock(new Date(Date.now() + min * 60000)) + '（今出発）';
   $('#rClimb').textContent = `↑${Math.round(r.ascent)}m ／ ↓${Math.round(r.descent)}m`;
   $('#rGrade').textContent = `上り ${r.maxUp.toFixed(1)}% ／ 下り ${Math.abs(r.maxDown).toFixed(1)}%`;
+  const sep = '<span class="sep">｜</span>';
+  $('#sumLine').innerHTML =
+    `<b>${(r.dist / 1000).toFixed(1)}km</b>${sep}${fmtDur(min)}${sep}到着 ${fmtClock(new Date(Date.now() + min * 60000))}${sep}↑${Math.round(r.ascent)}m`;
   $('#speedNote').textContent = `${b.name}・平地 平均${v}km/h、登り10mごとに約${b.climb}分を足して計算`;
 }
 
@@ -766,8 +767,35 @@ function loadFromUrl() {
   return true;
 }
 
+// ---------- 画面の切り替え（地点の指定 ⇔ 結果） ----------
+function setMode(mode, opts = {}) {
+  const pn = $('#panel');
+  pn.classList.toggle('mode-result', mode === 'result');
+  pn.classList.toggle('mode-edit', mode === 'edit');
+  pn.classList.remove('collapsed');
+  if (mode === 'result') pn.classList.toggle('detail', !!opts.detail);
+  $('#btnBackResult').hidden = !(mode === 'edit' && state.route);
+  updDetailBtn();
+  if (mode === 'result') drawProfile(null);
+}
+function updDetailBtn() {
+  $('#btnDetail').textContent = $('#panel').classList.contains('detail') ? '閉じる ▴' : '詳しく ▾';
+}
+function toggleDetail() {
+  $('#panel').classList.toggle('detail');
+  updDetailBtn();
+  drawProfile(null);
+}
+$('#btnEdit').addEventListener('click', () => setMode('edit'));
+$('#btnBackResult').addEventListener('click', () => setMode('result', { detail: innerWidth >= 760 }));
+$('#btnDetail').addEventListener('click', toggleDetail);
+
 // ---------- パネルの開閉と表示調整 ----------
-$('#panelHandle').addEventListener('click', () => $('#panel').classList.toggle('collapsed'));
+$('#panelHandle').addEventListener('click', () => {
+  const pn = $('#panel');
+  if (pn.classList.contains('mode-result')) toggleDetail();
+  else pn.classList.toggle('collapsed');
+});
 
 if (window.ResizeObserver) {
   new ResizeObserver(() => {
