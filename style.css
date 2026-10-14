@@ -224,6 +224,18 @@ body.ride-full #rideCard{display:none !important}
 body.ride-full #topbar #btnVoice{margin-left:auto}
 .rc-spd{font-size:34px;font-weight:800;line-height:1}
 .rc-spd small{font-size:12px;font-weight:600;color:var(--sub);margin-left:4px}
+.rc-sensor{font-size:13px;font-weight:700;color:#c0392b;margin-top:2px}
+.rc-sensor:empty{display:none}
+.ride-sensors{font-size:14px;font-weight:700;color:#c0392b;margin:6px 2px 0}
+.ride-sensors:empty{display:none}
+.toggle-row{display:flex;flex-wrap:wrap;gap:6px}
+#sensorList{list-style:none;margin:8px 0 0;padding:0}
+#sensorList li{padding:8px 4px;border-bottom:1px solid var(--line)}
+#sensorList .okc{color:var(--accent);font-weight:700}
+.mini-del{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:2px 8px;font-size:12px}
+#wheelSel{flex:1 1 auto;min-width:0;font-size:15px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--fg)}
+#wheelMm{max-width:90px !important}
+.wide-btn:disabled{opacity:.4}
 .rc-sub{font-size:12px;color:var(--sub);margin-top:3px;white-space:nowrap}
 /* 下の細い帯 */
 #panel.mode-ride:not(.ride-full) #rideFull{display:none}

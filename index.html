@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=10" rel="stylesheet">
+<link href="style.css?v=11" rel="stylesheet">
 </head>
 <body>
 
@@ -24,6 +24,7 @@
   <div id="rideCard" class="ride-only">
     <div class="rc-spd"><span id="rcSpd">--</span><small>km/h</small></div>
     <div class="rc-sub"><span id="rcDist">0.00 km</span>　<span id="rcTime">0:00:00</span></div>
+    <div id="rcSensor" class="rc-sensor"></div>
   </div>
   <button id="btnVoice" class="ride-only" title="音声案内">🔊</button>
   <button id="btn3d" class="ride-only txt" title="地図の向き">北↑</button>
@@ -104,7 +105,11 @@
     <div id="rdClimb" class="ride-climb route-only"></div>
     <canvas id="rideProfile" class="route-only"></canvas>
     <div id="rdStatus" class="ride-status"></div>
-    <button id="btnReroute" class="toggle-btn route-only">自動で引き直す：オン</button>
+    <div id="rdSensors" class="ride-sensors"></div>
+    <div class="toggle-row">
+      <button id="btnReroute" class="toggle-btn route-only">自動で引き直す：オン</button>
+      <button id="btnRideSensor" class="toggle-btn">センサーをつなぐ</button>
+    </div>
     <div id="rdNote" class="hint"></div>
     <div class="ride-btns">
       <button id="btnPause">⏸ 一時停止</button>
@@ -115,7 +120,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版10）</span>
+    <span class="ver">段階1 試作（版11）</span>
   </footer>
 </section>
 
@@ -226,6 +231,28 @@
   </div>
 </div>
 
+<!-- センサー -->
+<div id="sensorModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">センサー（Bluetooth）</div>
+    <p id="sensorSupport" class="hint"></p>
+    <div id="sensorLive" class="stats three"></div>
+    <button id="btnConnHr" class="wide-btn">♥ 心拍計をつなぐ</button>
+    <button id="btnConnCsc" class="wide-btn">⟳ スピード・ケイデンスセンサーをつなぐ</button>
+    <p id="sensorNote" class="hint"></p>
+    <ul id="sensorList" class="h-list"></ul>
+    <div class="group" style="margin-top:12px">
+      <div class="glabel">タイヤの周長（スピードと距離の計算に使います）</div>
+      <div class="speed-row">
+        <select id="wheelSel"></select>
+        <input id="wheelMm" type="number" inputmode="numeric" min="1000" max="2600" step="1"><span>mm</span>
+      </div>
+    </div>
+    <p class="hint">スピード・ケイデンスが別々のセンサーなら、ボタンを2回押して両方つないでください。メーカーのアプリなど、ほかのアプリとつながっていると見つからないことがあるので、そちらは閉じておいてください。ページを開き直すと、もう一度つなぐ必要があります。</p>
+    <button class="close" data-close>閉じる</button>
+  </div>
+</div>
+
 <!-- 設定 -->
 <div id="settingsModal" class="modal" hidden>
   <div class="sheet">
@@ -247,18 +274,20 @@
       <p class="hint">到着予定は「平均速度」と「登りの量」から計算した目安です。空欄なら、履歴から計算した自分の速さ（なければ自転車の種類ごとの標準の速度）を使います。</p>
       <p id="learnedNote" class="hint"></p>
     </div>
+    <button id="btnOpenSensor" class="wide-btn">⟳ センサー（Bluetooth）をつなぐ・タイヤの周長</button>
     <button id="btnSaveSettings" class="primary wide-btn">保存</button>
     <button class="close" data-close>閉じる</button>
   </div>
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=10"></script>
-<script src="elev.js?v=10"></script>
-<script src="app.js?v=10"></script>
-<script src="ride.js?v=10"></script>
-<script src="hist.js?v=10"></script>
-<script src="journey.js?v=10"></script>
-<script src="play.js?v=10"></script>
+<script src="config.js?v=11"></script>
+<script src="elev.js?v=11"></script>
+<script src="app.js?v=11"></script>
+<script src="sensor.js?v=11"></script>
+<script src="ride.js?v=11"></script>
+<script src="hist.js?v=11"></script>
+<script src="journey.js?v=11"></script>
+<script src="play.js?v=11"></script>
 </body>
 </html>

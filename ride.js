@@ -413,7 +413,7 @@ function onFix(p) {
   ride.pos = pos;
   showRidePos(pos);
 
-  if (ride.paused) { ride.last = null; ride.prevFixT = t; ride.segBreak = true; renderHud(); return; }
+  if (ride.paused) { ride.last = null; ride.lastWheel = null; ride.prevFixT = t; ride.segBreak = true; renderHud(); return; }
   if (acc > 40) { setStatus(`GPSの精度が低い状態です（±${Math.round(acc)}m）`, true); return; }
 
   const gapMs = ride.prevFixT ? t - ride.prevFixT : 0;
@@ -425,7 +425,10 @@ function onFix(p) {
   let spd = (c.speed != null && c.speed >= 0) ? c.speed * 3.6 : null;
   if (spd == null) spd = (ride.last && gapMs > 0 && !gap) ? d / (gapMs / 1000) * 3.6 : 0;
   if (spd > 90) spd = ride.spd; // あり得ない値は捨てる
-  ride.spd = ride.spd * 0.4 + spd * 0.6;
+  // スピードセンサーがあればそちらを使う（GPSより正確）
+  const ss = typeof sensorSpd === 'function' ? sensorSpd() : null;
+  if (ss != null) { spd = ss; ride.spd = ss; }
+  else ride.spd = ride.spd * 0.4 + spd * 0.6;
 
   // 自動一時停止
   if (ride.spd < AUTO_PAUSE_KMH) {
@@ -436,6 +439,17 @@ function onFix(p) {
     if (ride.autoPaused && ride.spd >= AUTO_RESUME_KMH) ride.autoPaused = false;
   }
 
+  // スピードセンサーの車輪の回転から出した距離（前の位置から増えた分）
+  const wa = typeof wheelActive === 'function' && wheelActive();
+  let dw = 0;
+  if (wa) {
+    if (ride.lastWheel == null) ride.lastWheel = sensor.wheelDist;
+    dw = sensor.wheelDist - ride.lastWheel;
+    ride.lastWheel = sensor.wheelDist;
+  } else {
+    ride.lastWheel = null;
+  }
+
   // 距離と走行時間
   let moved = false;
   if (!ride.last) {
@@ -443,14 +457,18 @@ function onFix(p) {
   } else if (gap) {
     // 画面が消えていた間は直線で距離を足す（速さが自転車らしいときだけ走行時間にも足す）
     const kmh = d / (gapMs / 1000) * 3.6;
-    ride.dist += d;
+    ride.dist += wa ? dw : d;
     if (kmh >= 5 && kmh <= 60) ride.movingMs += gapMs;
     ride.segBreak = true;
     moved = true;
     setNote(`画面が消えていた約${Math.round(gapMs / 60000)}分の間は記録できていません（距離は直線で足しました）`);
   } else {
     if (!ride.autoPaused) ride.movingMs += Math.min(gapMs, 10000);
-    if (!ride.autoPaused && d >= 3) { ride.dist += d; moved = true; }
+    if (!ride.autoPaused) {
+      if (wa) ride.dist += dw;
+      else if (d >= 3) ride.dist += d;
+    }
+    if (!ride.autoPaused && d >= 3) moved = true;
   }
   ride.prevFixT = t;
 
@@ -461,6 +479,11 @@ function onFix(p) {
     ride.course = c.heading;
   }
   if (acc <= 25 && spd < 80 && !ride.autoPaused) ride.maxSpd = Math.max(ride.maxSpd, ride.spd);
+  // 心拍とケイデンス（走っている間だけ平均に入れる）
+  const hr = typeof sensorHr === 'function' ? sensorHr() : null;
+  const cad = typeof sensorCad === 'function' ? sensorCad() : null;
+  if (hr != null && !ride.autoPaused) { ride.hrSum = (ride.hrSum || 0) + hr; ride.hrN = (ride.hrN || 0) + 1; ride.hrMax = Math.max(ride.hrMax || 0, hr); }
+  if (cad != null && cad > 0 && !ride.autoPaused) { ride.cadSum = (ride.cadSum || 0) + cad; ride.cadN = (ride.cadN || 0) + 1; }
 
   // ルート上の位置
   let onSample = null;
@@ -487,7 +510,8 @@ function onFix(p) {
 
   // 道筋の記録（4秒ごと、または途切れたとき）
   if (moved && (t - ride.lastPushT >= 4000 || ride.segBreak || !ride.track.length)) {
-    ride.track.push([t, +pos[1].toFixed(6), +pos[0].toFixed(6), ele != null ? Math.round(ele * 10) / 10 : null, ride.segBreak ? 1 : 0]);
+    ride.track.push([t, +pos[1].toFixed(6), +pos[0].toFixed(6), ele != null ? Math.round(ele * 10) / 10 : null, ride.segBreak ? 1 : 0,
+      hr != null ? hr : null, cad != null ? Math.round(cad) : null]);
     ride.lastPushT = t;
     ride.segBreak = false;
   }
@@ -527,6 +551,14 @@ function renderHud() {
   $('#rcSpd').textContent = $('#rdSpd').textContent;
   $('#rcDist').textContent = (r.dist / 1000).toFixed(2) + ' km';
   $('#rcTime').textContent = fmtHMS(r.movingMs);
+  // センサーの値（新しい値があれば速度もこちらを表示）
+  const sHr = typeof sensorHr === 'function' ? sensorHr() : null;
+  const sCad = typeof sensorCad === 'function' ? sensorCad() : null;
+  const sSpd = typeof sensorSpd === 'function' ? sensorSpd() : null;
+  if (sSpd != null && !r.paused) { $('#rdSpd').textContent = sSpd.toFixed(1); $('#rcSpd').textContent = sSpd.toFixed(1); }
+  const sens = [sHr != null ? `♥${sHr}` : '', sCad != null ? `⟳${Math.round(sCad)}` : ''].filter(Boolean).join(' ');
+  $('#rcSensor').textContent = sens;
+  $('#rdSensors').textContent = sens ? `${sHr != null ? '心拍 ' + sHr + 'bpm' : ''}${sHr != null && sCad != null ? '　' : ''}${sCad != null ? 'ケイデンス ' + Math.round(sCad) + 'rpm' : ''}` : '';
   $('#rbLine1').textContent = `平均 ${avg ? avg.toFixed(1) + 'km/h' : '--'}｜登り ${Math.round(r.up)}m`;
 
   if (r.withRoute && rr) {
@@ -702,6 +734,8 @@ function toRecord(r, endT) {
     id: r.start, start: r.start, end: endT,
     dist: r.dist, movingMs: r.movingMs, elapsedMs: endT - r.start,
     maxSpd: r.maxSpd, up: r.up, down: r.down,
+    avgHr: r.hrN ? Math.round(r.hrSum / r.hrN) : null, maxHr: r.hrMax || null,
+    avgCad: r.cadN ? Math.round(r.cadSum / r.cadN) : null,
     bike: r.bike, routeName: r.routeName, track: r.track
   };
 }
@@ -765,6 +799,8 @@ function showDone(rec, count, total, ev) {
     row('最高速度', rec.maxSpd.toFixed(1) + ' km/h') +
     row('登り', Math.round(rec.up) + ' m') +
     row('経過時間（止まっていた時間も含む）', fmtHMS(rec.elapsedMs)) +
+    (rec.avgHr ? row('心拍（平均／最高）', `${rec.avgHr}／${rec.maxHr} bpm`) : '') +
+    (rec.avgCad ? row('平均ケイデンス', `${rec.avgCad} rpm`) : '') +
     '</div>' +
     `<p class="total">これまでの記録 ${count}件・総走行距離 <b>${(total / 1000).toFixed(1)} km</b></p>` +
     (ev && ev.length

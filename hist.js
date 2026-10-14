@@ -73,6 +73,7 @@ function renderHistory() {
       `<div class="h-sub">${esc(r.routeName || 'ルートなし')}・${fmtHMS(r.movingMs)}・平均${avg.toFixed(1)}km/h</div>` +
       (open
         ? `<div class="h-detail">最高 ${(r.maxSpd || 0).toFixed(1)}km/h・登り ${Math.round(r.up || 0)}m・経過 ${fmtHMS(r.elapsedMs || 0)}</div>` +
+          (r.avgHr || r.avgCad ? `<div class="h-detail">${r.avgHr ? `心拍 平均${r.avgHr}・最高${r.maxHr}bpm` : ''}${r.avgHr && r.avgCad ? '・' : ''}${r.avgCad ? `ケイデンス 平均${r.avgCad}rpm` : ''}</div>` : '') +
           `<div class="h-btns"><button data-act="route" class="go-t">この道を走る</button><button data-act="map">地図で見る</button></div>` +
           `<div class="h-btns"><button data-act="gpx">GPX</button><button data-act="del" class="danger-t">削除</button></div>`
         : '') +
@@ -208,10 +209,13 @@ function parseGpx(text) {
   if (doc.getElementsByTagName('parsererror').length) throw new Error('GPXファイルとして読めませんでした');
   const readPts = nodes => nodes.map(n => {
     const e = n.getElementsByTagName('ele')[0], tm = n.getElementsByTagName('time')[0];
+    // 心拍・ケイデンス（名前空間の付け方はアプリによって違うので、名前の後ろだけで探す）
+    const ext = tag => { const el = [...n.getElementsByTagName('*')].find(x => x.localName === tag); return el ? parseFloat(el.textContent) : null; };
     return {
       lat: parseFloat(n.getAttribute('lat')), lng: parseFloat(n.getAttribute('lon')),
       ele: e ? parseFloat(e.textContent) : null,
-      t: tm ? Date.parse(tm.textContent) : null
+      t: tm ? Date.parse(tm.textContent) : null,
+      hr: ext('hr'), cad: ext('cad')
     };
   }).filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lng));
   const nameOf = el => { const n = el.getElementsByTagName('name')[0]; return n ? n.textContent.trim() : ''; };
@@ -233,8 +237,10 @@ function parseGpx(text) {
 function gpxToRecord(tk) {
   const track = [];
   tk.segs.forEach((sg, si) => sg.forEach((p, i) => {
-    track.push([p.t, +p.lat.toFixed(6), +p.lng.toFixed(6), p.ele != null && Number.isFinite(p.ele) ? Math.round(p.ele * 10) / 10 : null, si > 0 && i === 0 ? 1 : 0]);
+    track.push([p.t, +p.lat.toFixed(6), +p.lng.toFixed(6), p.ele != null && Number.isFinite(p.ele) ? Math.round(p.ele * 10) / 10 : null, si > 0 && i === 0 ? 1 : 0,
+      Number.isFinite(p.hr) ? p.hr : null, Number.isFinite(p.cad) ? p.cad : null]);
   }));
+  const hrs = track.map(p => p[5]).filter(v => v != null), cads = track.map(p => p[6]).filter(v => v != null && v > 0);
   let dist = 0, moving = 0, maxSpd = 0, up = 0, down = 0, base = null;
   for (let i = 1; i < track.length; i++) {
     const a = track[i - 1], b = track[i];
@@ -262,7 +268,9 @@ function gpxToRecord(tk) {
   const start = track[0][0], end = track[track.length - 1][0];
   return {
     id: start, start, end, dist, movingMs: moving, elapsedMs: end - start,
-    maxSpd, up, down, bike: null, routeName: name || null, track, imported: true
+    maxSpd, up, down, bike: null, routeName: name || null, track, imported: true,
+    avgHr: hrs.length ? Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length) : null, maxHr: hrs.length ? Math.max(...hrs) : null,
+    avgCad: cads.length ? Math.round(cads.reduce((a, b) => a + b, 0) / cads.length) : null
   };
 }
 
@@ -310,14 +318,17 @@ function xmlEsc(s) {
 function toGpx(recs) {
   const L = [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<gpx version="1.1" creator="ChariMiru" xmlns="http://www.topografix.com/GPX/1/1">',
+    '<gpx version="1.1" creator="ChariMiru" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">',
     `<metadata><time>${new Date().toISOString()}</time></metadata>`
   ];
   recs.forEach(r => {
     L.push('<trk>', `<name>${xmlEsc((r.routeName || 'ルートなし') + ' ' + fmtDate(r.start))}</name>`, '<type>cycling</type>', '<trkseg>');
     (r.track || []).forEach((p, i) => {
       if (p[4] && i > 0) L.push('</trkseg>', '<trkseg>');
-      L.push(`<trkpt lat="${p[1]}" lon="${p[2]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ''}<time>${new Date(p[0]).toISOString()}</time></trkpt>`);
+      const ext = (p[5] != null || p[6] != null)
+        ? `<extensions><gpxtpx:TrackPointExtension>${p[5] != null ? `<gpxtpx:hr>${p[5]}</gpxtpx:hr>` : ''}${p[6] != null ? `<gpxtpx:cad>${p[6]}</gpxtpx:cad>` : ''}</gpxtpx:TrackPointExtension></extensions>`
+        : '';
+      L.push(`<trkpt lat="${p[1]}" lon="${p[2]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ''}<time>${new Date(p[0]).toISOString()}</time>${ext}</trkpt>`);
     });
     L.push('</trkseg>', '</trk>');
   });
