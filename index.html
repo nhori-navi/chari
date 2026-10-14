@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#3d8b6e">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=4" rel="stylesheet">
+<link href="style.css?v=5" rel="stylesheet">
 </head>
 <body>
 
@@ -15,6 +15,10 @@
 
 <header id="topbar">
   <span class="logo">ChariMiru</span>
+  <div id="rideCard" class="ride-only">
+    <div class="rc-spd"><span id="rcSpd">--</span><small>km/h</small></div>
+    <div class="rc-sub"><span id="rcDist">0.00 km</span>　<span id="rcTime">0:00:00</span></div>
+  </div>
   <button id="btnVoice" class="ride-only" title="音声案内">🔊</button>
   <button id="btn3d" class="ride-only txt" title="2D／3D">2D</button>
   <button id="btnLocate" title="現在地">◎</button>
@@ -66,6 +70,18 @@
 
   <!-- 走行中の画面 -->
   <div id="rideArea">
+    <div id="rdToast"></div>
+    <!-- 小さい表示（初めはこちら） -->
+    <div id="rideBar">
+      <div class="rb-text" title="タップで詳しく">
+        <div id="rbLine1"></div>
+        <div id="rbLine2" class="route-only"></div>
+      </div>
+      <button id="btnPauseS" class="rb-btn" title="一時停止">⏸</button>
+      <button id="btnFinishS" class="rb-btn danger" title="終了">■</button>
+    </div>
+    <!-- 詳しい表示 -->
+    <div id="rideFull">
     <div class="ride-speed"><span id="rdSpd">--</span><small>km/h</small></div>
     <div class="ride-grid">
       <div><span class="label">走行時間</span><span id="rdTime">0:00:00</span></div>
@@ -83,11 +99,12 @@
       <button id="btnPause">⏸ 一時停止</button>
       <button id="btnFinish" class="danger">■ 終了</button>
     </div>
+    </div>
   </div>
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版4）</span>
+    <span class="ver">段階1 試作（版5）</span>
   </footer>
 </section>
 
@@ -149,8 +166,8 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=4"></script>
-<script src="app.js?v=4"></script>
-<script src="ride.js?v=4"></script>
+<script src="config.js?v=5"></script>
+<script src="app.js?v=5"></script>
+<script src="ride.js?v=5"></script>
 </body>
 </html>

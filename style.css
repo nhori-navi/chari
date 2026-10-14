@@ -211,7 +211,36 @@ button{font:inherit;color:inherit;cursor:pointer}
   display:block;width:100%;margin:2px 0 4px;padding:10px;border-radius:8px;
   border:1px dashed var(--accent);background:var(--bg);color:var(--accent);font-weight:700;
 }
-body:not(.riding) .ride-only{display:none}
+body:not(.riding) .ride-only{display:none !important}
+body.riding .logo{display:none}
+/* 左上の速度の札 */
+#rideCard{
+  margin-right:auto;min-width:118px;
+  background:var(--panel);border-radius:14px;padding:6px 12px 7px;
+  box-shadow:0 1px 4px rgba(0,0,0,.25);
+  font-variant-numeric:tabular-nums;
+}
+body.ride-full #rideCard{display:none !important}
+body.ride-full #topbar #btnVoice{margin-left:auto}
+.rc-spd{font-size:34px;font-weight:800;line-height:1}
+.rc-spd small{font-size:12px;font-weight:600;color:var(--sub);margin-left:4px}
+.rc-sub{font-size:12px;color:var(--sub);margin-top:3px;white-space:nowrap}
+/* 下の細い帯 */
+#panel.mode-ride:not(.ride-full) #rideFull{display:none}
+#panel.mode-ride.ride-full #rideBar{display:none}
+#rideBar{display:flex;align-items:center;gap:8px}
+.rb-text{flex:1 1 auto;min-width:0;cursor:pointer}
+#rbLine1{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+#rbLine2{font-size:13px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-btn{
+  flex:0 0 auto;width:46px;height:46px;border-radius:50%;
+  border:1px solid var(--line);background:var(--bg);font-size:18px;
+}
+.rb-btn.danger{background:#c0392b;color:#fff;border-color:#c0392b}
+#rdToast{font-size:13px;font-weight:700;margin:0 2px 6px;color:var(--sub);cursor:pointer}
+#rdToast.warn{color:#c0392b}
+#rdToast:empty{display:none}
+#panel.ride-full #rdToast{display:none}
 body.riding #btnSettings{display:none}
 #topbar button.txt{font-size:14px;font-weight:800}
 #topbar button.on{background:var(--accent);color:#fff}

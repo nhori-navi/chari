@@ -791,6 +791,7 @@ function setMode(mode, opts = {}) {
   pn.classList.toggle('mode-result', mode === 'result');
   pn.classList.toggle('mode-edit', mode === 'edit');
   pn.classList.toggle('mode-ride', mode === 'ride');
+  if (mode !== 'ride') { pn.classList.remove('ride-full'); document.body.classList.remove('ride-full'); }
   pn.classList.remove('collapsed');
   if (mode === 'result') pn.classList.toggle('detail', !!opts.detail);
   $('#btnBackResult').hidden = !(mode === 'edit' && state.route);
@@ -814,6 +815,7 @@ $('#panelHandle').addEventListener('click', () => {
   const pn = $('#panel');
   if (pn.classList.contains('mode-result')) toggleDetail();
   else if (pn.classList.contains('mode-edit')) pn.classList.toggle('collapsed');
+  else if (pn.classList.contains('mode-ride')) toggleRideFull();
 });
 
 if (window.ResizeObserver) {

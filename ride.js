@@ -54,12 +54,30 @@ function speak(text) {
   } catch (e) { /* 無視 */ }
 }
 
+let statusText = '', statusWarn = false, noteText = '';
 function setStatus(text, warn) {
   const el = $('#rdStatus');
   el.textContent = text;
   el.className = 'ride-status' + (warn ? ' warn' : '');
+  statusText = text === '● 記録中' ? '' : text; // 小さい表示では、普段の「記録中」は出さない
+  statusWarn = !!warn;
+  updToast();
 }
-function setNote(text) { $('#rdNote').textContent = text || ''; }
+function setNote(text) { noteText = text || ''; $('#rdNote').textContent = noteText; updToast(); }
+function updToast() {
+  const el = $('#rdToast');
+  el.textContent = statusText || noteText;
+  el.className = statusText && statusWarn ? 'warn' : '';
+}
+// 知らせをタップすると、注意書き（自動ロックなど）は消す
+$('#rdToast').addEventListener('click', () => { if (!statusText) setNote(''); });
+
+function toggleRideFull() {
+  const full = $('#panel').classList.toggle('ride-full');
+  document.body.classList.toggle('ride-full', full);
+  if (ride) { renderHud(); if (follow && ride.last) moveCamera(ride.last); }
+}
+$('#rideBar .rb-text').addEventListener('click', toggleRideFull);
 
 // ---------- ルートの下ごしらえ（坂の区間、残りの登り） ----------
 let rr = null;
@@ -169,6 +187,8 @@ function beginRide() {
   $('#panel').classList.toggle('with-route', !!ride.withRoute);
   if (ride.withRoute) prepRoute(); else rr = null;
   setMode('ride');
+  setNote('');
+  statusText = '';
   updateMarkers(); // 走行中は印を動かせないようにする
   follow = true;
   updFollowBtn();
@@ -204,7 +224,7 @@ async function requestWake() {
       return;
     }
   } catch (e) { /* 下の案内へ */ }
-  setNote('画面が自動で消えると記録が止まります。iPhoneの「設定 → 画面表示と明るさ → 自動ロック」を「なし」にしておくと安心です');
+  setNote('画面が消えると記録が止まります。自動ロックを「なし」に（設定→画面表示と明るさ）。タップで閉じる');
 }
 
 // ---------- 位置が届いたとき ----------
@@ -324,6 +344,11 @@ function renderHud() {
   $('#rdAvg').textContent = avg ? avg.toFixed(1) + ' km/h' : '--';
   $('#rdUp').textContent = Math.round(r.up) + ' m';
   $('#btnPause').textContent = r.paused ? '▶ 再開' : '⏸ 一時停止';
+  $('#btnPauseS').textContent = r.paused ? '▶' : '⏸';
+  $('#rcSpd').textContent = $('#rdSpd').textContent;
+  $('#rcDist').textContent = (r.dist / 1000).toFixed(2) + ' km';
+  $('#rcTime').textContent = fmtHMS(r.movingMs);
+  $('#rbLine1').textContent = `平均 ${avg ? avg.toFixed(1) + 'km/h' : '--'}｜登り ${Math.round(r.up)}m`;
 
   if (r.withRoute && rr) {
     const prog = rr.S[r.progIdx].d;
@@ -335,7 +360,9 @@ function renderHud() {
     $('#rdRem').textContent = (rem / 1000).toFixed(1) + ' km';
     $('#rdEta').textContent = fmtClock(new Date(Date.now() + min * 60000));
     $('#rdClimb').textContent = climbText(prog);
-    drawProfile(r.progIdx, $('#rideProfile'));
+    $('#rbLine1').textContent = `残り ${(rem / 1000).toFixed(1)}km｜到着 ${$('#rdEta').textContent}`;
+    $('#rbLine2').textContent = climbText(prog);
+    if ($('#panel').classList.contains('ride-full')) drawProfile(r.progIdx, $('#rideProfile'));
   }
 
   if (r.paused) setStatus('⏸ 一時停止中（記録していません）');
@@ -394,7 +421,7 @@ function camOffset(ratio) {
 function moveCamera(pos) {
   if (!follow || !ride) return;
   if (view3d) {
-    map.easeTo({ center: pos, bearing: ride.course != null ? ride.course : map.getBearing(), pitch: 60, offset: camOffset(0.68), duration: 900 });
+    map.easeTo({ center: pos, bearing: ride.course != null ? ride.course : map.getBearing(), pitch: 60, offset: camOffset(0.72), duration: 900 });
   } else {
     map.easeTo({ center: pos, bearing: 0, pitch: 0, offset: camOffset(0.5), duration: 900 });
   }
@@ -459,16 +486,18 @@ map.on('dragstart', e => {
 });
 
 // ---------- 一時停止・終了 ----------
-$('#btnPause').addEventListener('click', () => {
+function togglePause() {
   if (!ride) return;
   ride.paused = !ride.paused;
   if (ride.paused) { ride.segBreak = true; speak('一時停止しました'); }
   else { ride.last = null; ride.slowSince = null; speak('記録を再開します'); }
   renderHud();
   persist();
-});
-
+}
+$('#btnPause').addEventListener('click', togglePause);
+$('#btnPauseS').addEventListener('click', togglePause);
 $('#btnFinish').addEventListener('click', () => finishRide(true));
+$('#btnFinishS').addEventListener('click', () => finishRide(true));
 
 function stopHardware() {
   if (watchId != null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
