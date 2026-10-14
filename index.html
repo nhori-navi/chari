@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#3d8b6e">
+<title>ChariMiru</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
+<link href="style.css" rel="stylesheet">
+</head>
+<body>
+
+<div id="map"></div>
+
+<header id="topbar">
+  <span class="logo">ChariMiru</span>
+  <button id="btnLocate" title="現在地">◎</button>
+  <button id="btnSettings" title="設定">⚙</button>
+</header>
+
+<section id="panel">
+  <div id="panelHandle" title="パネルを縮める／広げる"></div>
+
+  <button id="condLine" class="cond"></button>
+
+  <div id="points"></div>
+
+  <div class="row-actions">
+    <button id="btnAddVia">＋経由地</button>
+    <button id="btnSwap">⇅ 入れ替え</button>
+    <button id="btnSearch" class="primary">ルート検索</button>
+  </div>
+
+  <div id="msg"></div>
+
+  <div id="result" hidden>
+    <div class="stats">
+      <div><span class="label">距離</span><span id="rDist"></span></div>
+      <div><span class="label">所要時間（目安）</span><span id="rTime"></span></div>
+      <div><span class="label">到着予定</span><span id="rEta"></span></div>
+      <div><span class="label">登り／下り</span><span id="rClimb"></span></div>
+      <div class="wide"><span class="label">最大勾配</span><span id="rGrade"></span></div>
+    </div>
+    <div id="speedNote" class="hint"></div>
+    <canvas id="profile"></canvas>
+    <div id="profileInfo" class="hint">グラフを指でなぞると、地図にその地点が出ます</div>
+    <div id="legend" class="legend"></div>
+    <button id="btnShare" class="share">共有リンクを作る</button>
+  </div>
+
+  <footer id="footer">
+    <a id="seriesLink" hidden>シリーズのTOPへ</a>
+    <span class="ver">段階1 試作</span>
+  </footer>
+</section>
+
+<!-- 地点の検索 -->
+<div id="searchModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title" id="searchTitle">地点を指定</div>
+    <input id="searchInput" type="search" placeholder="駅名・地名・住所など" enterkeyhint="search" autocomplete="off">
+    <button id="btnUseHere" class="wide-btn">◎ 現在地を使う</button>
+    <ul id="searchResults"></ul>
+    <p class="hint">地図を長押し（パソコンは右クリック）しても指定できます</p>
+    <button class="close" data-close>閉じる</button>
+  </div>
+</div>
+
+<!-- 地図の長押しメニュー -->
+<div id="pickModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">この地点を…</div>
+    <button class="wide-btn" data-pick="start">出発地にする</button>
+    <button class="wide-btn" data-pick="via">経由地に追加</button>
+    <button class="wide-btn" data-pick="goal">目的地にする</button>
+    <button class="close" data-close>キャンセル</button>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div id="settingsModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">設定</div>
+    <div class="group">
+      <div class="glabel">自転車の種類</div>
+      <div id="bikeOpts" class="opts"></div>
+    </div>
+    <div class="group">
+      <div class="glabel">ルートの好み</div>
+      <div id="prefOpts" class="opts"></div>
+    </div>
+    <div class="group">
+      <div class="glabel">平地での平均速度（任意）</div>
+      <div class="speed-row">
+        <input id="speedInput" type="number" inputmode="decimal" min="5" max="50" step="1" placeholder="空欄なら自動">
+        <span>km/h</span>
+      </div>
+      <p class="hint">到着予定は「平均速度」と「登りの量」から計算した目安です。空欄なら自転車の種類ごとの標準の速度を使います。</p>
+    </div>
+    <button id="btnSaveSettings" class="primary wide-btn">保存</button>
+    <button class="close" data-close>閉じる</button>
+  </div>
+</div>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
