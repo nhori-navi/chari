@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#3d8b6e">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=2" rel="stylesheet">
+<link href="style.css?v=3" rel="stylesheet">
 </head>
 <body>
 
@@ -33,7 +33,7 @@
     <div class="row-actions">
       <button id="btnAddVia">＋経由地</button>
       <button id="btnSwap">⇅ 入れ替え</button>
-      <button id="btnSearch" class="primary">ルート検索</button>
+      <button id="btnSearch" class="primary" hidden>再検索</button>
     </div>
   </div>
 
@@ -42,11 +42,6 @@
   <!-- ルートの結果（結果モード） -->
   <div id="result">
     <div id="sumLine" class="sum-line"></div>
-    <div class="sum-btns">
-      <button id="btnEdit">✎ 地点を変える</button>
-      <button id="btnShare">共有</button>
-      <button id="btnDetail">詳しく ▾</button>
-    </div>
     <div class="stats detail-only">
       <div><span class="label">距離</span><span id="rDist"></span></div>
       <div><span class="label">所要時間（目安）</span><span id="rTime"></span></div>
@@ -56,13 +51,18 @@
     </div>
     <div id="speedNote" class="hint detail-only"></div>
     <canvas id="profile"></canvas>
-    <div id="profileInfo" class="hint">グラフを指でなぞると、地図にその地点が出ます</div>
-    <div id="legend" class="legend"></div>
+    <div class="sum-btns">
+      <button id="btnEdit">✎ 地点を変える</button>
+      <button id="btnShare">共有</button>
+      <button id="btnDetail">詳しく ▾</button>
+    </div>
+    <div id="profileInfo" class="hint detail-only">グラフを指でなぞると、地図にその地点が出ます</div>
+    <div id="legend" class="legend detail-only"></div>
   </div>
 
-  <footer id="footer">
+  <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版2）</span>
+    <span class="ver">段階1 試作（版3）</span>
   </footer>
 </section>
 
@@ -115,7 +115,7 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=2"></script>
-<script src="app.js?v=2"></script>
+<script src="config.js?v=3"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

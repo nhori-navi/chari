@@ -154,11 +154,16 @@ button{font:inherit;color:inherit;cursor:pointer}
 #panel.mode-edit #result{display:none}
 #panel.mode-result #editArea{display:none}
 #panel.mode-result:not(.detail) .detail-only{display:none !important}
-#panel.mode-result:not(.detail) #profile{height:96px}
-.sum-line{font-size:14px;margin:0 2px 8px;line-height:1.5}
+#panel.mode-result:not(.detail) #profile{height:56px;margin-top:0}
+#panel.mode-result:not(.detail) .sum-btns{margin-top:6px}
+#panel.mode-result:not(.detail) .sum-btns button{padding:7px 4px}
+#panel.mode-result{padding-top:0}
+#panel.mode-result #panelHandle{margin:6px auto 6px}
+#msg:empty{display:none}
+.sum-line{font-size:14px;margin:0 2px 6px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sum-line b{font-size:19px;color:var(--accent)}
 .sum-line .sep{color:var(--line);margin:0 4px}
-.sum-btns{display:flex;gap:6px;margin-bottom:4px}
+.sum-btns{display:flex;gap:6px;margin:8px 0 4px}
 .sum-btns button{
   flex:1 1 auto;padding:9px 6px;border-radius:8px;
   border:1px solid var(--line);background:var(--bg);font-size:14px;

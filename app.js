@@ -493,6 +493,7 @@ async function searchRoute() {
   if (!keysOk) { msg('config.js にキーを設定してください', true); return; }
 
   const seq = ++searchSeq;
+  $('#btnSearch').hidden = true;
   msg('ルートを検索中…');
   const pts = state.points.filter(p => p.lng != null);
   const bike = BIKES[state.bike];
@@ -514,7 +515,11 @@ async function searchRoute() {
       j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: false, preference });
       note = '※一部の条件（坂を避ける・階段を避ける等）を外して検索しました';
     } catch (e2) {
-      if (seq === searchSeq) msg('ルートが見つかりませんでした：' + e2.message, true);
+      if (seq === searchSeq) {
+        msg('ルートが見つかりませんでした：' + e2.message, true);
+        setMode('edit');
+        $('#btnSearch').hidden = false; // 失敗したときだけ「再検索」を出す
+      }
       return;
     }
   }
@@ -659,7 +664,8 @@ function drawProfile(cursorIdx) {
   ctx.clearRect(0, 0, W, H);
 
   const s = r.samples;
-  const padL = 40, padR = 8, padT = 10, padB = 18;
+  const small = H < 80; // 結果モードの小さい断面図
+  const padL = 40, padR = 8, padT = small ? 6 : 10, padB = small ? 6 : 18;
   let eMin = Infinity, eMax = -Infinity;
   s.forEach(p => { eMin = Math.min(eMin, p.es); eMax = Math.max(eMax, p.es); });
   if (eMax - eMin < 20) { const m = (eMax + eMin) / 2; eMin = m - 10; eMax = m + 10; }
@@ -691,10 +697,12 @@ function drawProfile(cursorIdx) {
   ctx.textAlign = 'right';
   ctx.fillText(Math.round(eMax) + 'm', padL - 4, padT + 8);
   ctx.fillText(Math.round(eMin) + 'm', padL - 4, H - padB);
-  ctx.textAlign = 'left';
-  ctx.fillText('0', padL, H - 4);
-  ctx.textAlign = 'right';
-  ctx.fillText((r.total / 1000).toFixed(1) + 'km', W - padR, H - 4);
+  if (!small) {
+    ctx.textAlign = 'left';
+    ctx.fillText('0', padL, H - 4);
+    ctx.textAlign = 'right';
+    ctx.fillText((r.total / 1000).toFixed(1) + 'km', W - padR, H - 4);
+  }
 
   // なぞっている位置
   if (cursorIdx != null) {
@@ -722,12 +730,17 @@ function onProfile(e) {
   const i = Math.min(r.samples.length - 1, Math.round(t * r.total / STEP));
   const p = r.samples[i];
   drawProfile(i);
-  $('#profileInfo').textContent = `${(p.d / 1000).toFixed(2)}km地点　標高 ${Math.round(p.es)}m　勾配 ${p.g.toFixed(1)}%`;
+  const info = `${(p.d / 1000).toFixed(2)}km地点　標高 ${Math.round(p.es)}m　勾配 ${p.g.toFixed(1)}%`;
+  $('#profileInfo').textContent = info;
+  if (!$('#panel').classList.contains('detail')) $('#sumLine').textContent = info;
   showCursor(p.lng, p.lat);
 }
 const cv = $('#profile');
 cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); onProfile(e); });
 cv.addEventListener('pointermove', e => { if (e.pointerType === 'mouse' || e.buttons) onProfile(e); });
+// なぞり終わったら、小さい表示の1行を元の要約に戻す
+cv.addEventListener('pointerup', () => { if (!$('#panel').classList.contains('detail')) setTimeout(updateResult, 1500); });
+cv.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !$('#panel').classList.contains('detail')) updateResult(); });
 window.addEventListener('resize', () => drawProfile(null));
 
 $('#legend').innerHTML = '上り坂：' + GRADES.map(g => `<span><i style="background:${g.color}"></i>${g.label}</span>`).join('');
