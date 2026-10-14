@@ -263,6 +263,44 @@ body.riding .no-ride{display:none !important}
 .h-btns{display:flex;gap:6px;margin-top:8px}
 .h-btns button{flex:1 1 0;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
 .danger-t{color:#c0392b !important}
+/* バーチャル長距離の旅 */
+body.journey #panel,body.journey #histChip,body.journey #topbar button{display:none !important}
+#journeyPanel{
+  position:fixed;left:0;right:0;bottom:0;z-index:6;
+  max-height:46vh;overflow-y:auto;
+  background:var(--panel);border-radius:16px 16px 0 0;
+  box-shadow:0 -2px 10px rgba(0,0,0,.2);
+  padding:12px 12px calc(10px + env(safe-area-inset-bottom,0px));
+}
+@media (min-width:760px){
+  #journeyPanel{left:12px;right:auto;top:68px;bottom:12px;width:390px;max-height:none;border-radius:16px}
+}
+.jp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.jp-head .hint{margin:2px 0 0}
+#btnJourneyClose{
+  flex:0 0 auto;padding:8px 12px;border-radius:8px;
+  border:1px solid var(--accent);background:var(--bg);color:var(--accent);font-weight:700;
+}
+#jpNow{margin-top:10px;font-size:15px}
+#jpNow small{color:var(--sub)}
+.jp-bar{height:8px;border-radius:4px;background:var(--line);overflow:hidden;margin:6px 0 2px}
+.jp-bar i{display:block;height:100%;background:#e07b2e;border-radius:4px}
+#jpList{list-style:none;margin:8px 0 0;padding:0}
+#jpList li{padding:8px 4px;border-bottom:1px solid var(--line);cursor:pointer}
+#jpList li.lock{opacity:.5;cursor:default}
+#jpList li.cur{background:rgba(224,123,46,.10);border-radius:8px}
+.jl-top{display:flex;justify-content:space-between;gap:8px}
+.jl-top span{color:var(--sub);font-size:13px;white-space:nowrap}
+.jl-sub{font-size:12px;color:var(--sub);margin-top:2px}
+#jpList li.done .jl-sub{color:var(--accent)}
+.jr-me{
+  font-size:22px;line-height:1;background:#fff;border-radius:50%;padding:4px;
+  box-shadow:0 1px 4px rgba(0,0,0,.4);
+}
+.jr-ev{margin-top:12px;padding:10px;border-radius:10px;background:rgba(224,123,46,.10);font-size:14px}
+.jr-ev div{margin:3px 0}
+.jr-ev .big{font-weight:800;color:#c0602a;font-size:15px}
+.jr-ev .wide-btn{margin-top:8px}
 .go-t{color:var(--accent) !important;font-weight:700;border-color:var(--accent) !important}
 .file-btn{cursor:pointer;color:var(--accent);font-weight:700}
 .toggle-btn{

@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=7" rel="stylesheet">
+<link href="style.css?v=8" rel="stylesheet">
 </head>
 <body>
 
@@ -27,6 +27,7 @@
   </div>
   <button id="btnVoice" class="ride-only" title="音声案内">🔊</button>
   <button id="btn3d" class="ride-only txt" title="地図の向き">北↑</button>
+  <button id="btnJourney" class="no-ride txt" title="バーチャル長距離の旅">旅</button>
   <button id="btnHist" class="no-ride txt" title="走行の履歴">履歴</button>
   <button id="btnLocate" title="現在地">◎</button>
   <button id="btnSettings" title="設定">⚙</button>
@@ -112,7 +113,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版7）</span>
+    <span class="ver">段階1 試作（版8）</span>
   </footer>
 </section>
 
@@ -138,6 +139,19 @@
     <button class="close" data-close>キャンセル</button>
   </div>
 </div>
+
+<!-- バーチャル長距離の旅 -->
+<section id="journeyPanel" hidden>
+  <div class="jp-head">
+    <div><b>バーチャル長距離の旅</b><div id="jpTotal" class="hint"></div></div>
+    <button id="btnJourneyClose">地図に戻る</button>
+  </div>
+  <div id="jpNow"></div>
+  <div class="jp-bar"><i id="jpBarFill"></i></div>
+  <div id="jpNext" class="hint"></div>
+  <ul id="jpList"></ul>
+  <p class="hint">これまでの走行記録の合計距離で、短いコースから順に進みます。1つ制覇すると次のコースが開きます。距離は代表的な地点を結んだ目安です。</p>
+</section>
 
 <!-- 履歴の道筋を表示中の札 -->
 <div id="histChip" hidden><span id="histChipText"></span><button id="histChipClose" title="消す">×</button></div>
@@ -204,10 +218,11 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=7"></script>
-<script src="elev.js?v=7"></script>
-<script src="app.js?v=7"></script>
-<script src="ride.js?v=7"></script>
-<script src="hist.js?v=7"></script>
+<script src="config.js?v=8"></script>
+<script src="elev.js?v=8"></script>
+<script src="app.js?v=8"></script>
+<script src="ride.js?v=8"></script>
+<script src="hist.js?v=8"></script>
+<script src="journey.js?v=8"></script>
 </body>
 </html>

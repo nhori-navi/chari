@@ -705,14 +705,19 @@ async function saveAndReport(rec, talk) {
     refreshLearned();
     const all = await allRides();
     const total = all.reduce((s, x) => s + (x.dist || 0), 0);
-    showDone(rec, all.length, total);
-    if (talk) speak(`記録を保存しました。${(rec.dist / 1000).toFixed(1)}キロ、走行時間${Math.round(rec.movingMs / 60000)}分でした`);
+    const ev = typeof journeyEvents === 'function' ? journeyEvents((total - rec.dist) / 1000, total / 1000) : [];
+    showDone(rec, all.length, total, ev);
+    if (talk) {
+      speak(`記録を保存しました。${(rec.dist / 1000).toFixed(1)}キロ、走行時間${Math.round(rec.movingMs / 60000)}分でした`);
+      // 旅の知らせ（多いときは最後の3つ）
+      ev.slice(-3).forEach(x => speak(x.text.replace('🎉 ', '').replace('：', '、')));
+    }
   } catch (e) {
     msg('記録の保存に失敗しました：' + (e && e.message ? e.message : e), true);
   }
 }
 
-function showDone(rec, count, total) {
+function showDone(rec, count, total, ev) {
   const avg = rec.movingMs > 0 ? rec.dist / 1000 / (rec.movingMs / 3600000) : 0;
   const row = (k, v) => `<div><span class="label">${k}</span><span>${v}</span></div>`;
   $('#doneBody').innerHTML =
@@ -725,7 +730,15 @@ function showDone(rec, count, total) {
     row('登り', Math.round(rec.up) + ' m') +
     row('経過時間（止まっていた時間も含む）', fmtHMS(rec.elapsedMs)) +
     '</div>' +
-    `<p class="total">これまでの記録 ${count}件・総走行距離 <b>${(total / 1000).toFixed(1)} km</b></p>`;
+    `<p class="total">これまでの記録 ${count}件・総走行距離 <b>${(total / 1000).toFixed(1)} km</b></p>` +
+    (ev && ev.length
+      ? '<div class="jr-ev"><div class="glabel">バーチャル長距離の旅</div>' +
+        (ev.length > 6 ? `<div>ほか${ev.length - 6}件…</div>` : '') +
+        ev.slice(-6).map(x => `<div class="${x.type === 'done' ? 'big' : ''}">${esc(x.text)}</div>`).join('') +
+        '<button id="btnDoneJourney" class="wide-btn">旅の地図を見る</button></div>'
+      : '');
+  const bj = document.getElementById('btnDoneJourney');
+  if (bj) bj.addEventListener('click', () => { closeModals(); openJourney(); });
   openModal('#doneModal');
 }
 
