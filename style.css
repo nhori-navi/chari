@@ -83,6 +83,48 @@ button{font:inherit;color:inherit;cursor:pointer}
   .mapboxgl-ctrl-bottom-left{left:410px}
 }
 
+/* 使い方ナビ・紹介・ヘルプ */
+#helpRow{display:flex;justify-content:space-between;align-items:center;margin:0 2px 6px;font-size:13px;color:var(--sub)}
+#helpRow label{display:flex;align-items:center;gap:6px}
+#helpRow input{accent-color:var(--accent);width:16px;height:16px}
+#btnHelp{border:1px solid var(--line);background:var(--bg);border-radius:14px;padding:4px 10px;font-size:13px}
+#tip{
+  position:fixed;left:12px;right:12px;top:calc(62px + env(safe-area-inset-top,0px));z-index:30;
+  max-width:480px;margin:0 auto;display:flex;align-items:flex-start;gap:8px;
+  background:#fff6c9;color:#3a3200;border:1px solid #e0b630;border-radius:12px;
+  padding:10px 8px 10px 12px;font-size:14px;line-height:1.5;box-shadow:0 2px 8px rgba(0,0,0,.25);
+}
+#tip span{flex:1 1 auto}
+#tip button{flex:0 0 auto;border:none;background:rgba(0,0,0,.08);border-radius:50%;width:26px;height:26px;color:#3a3200}
+@media (min-width:760px){ #tip{left:420px;right:20px;margin:0} }
+.hl{outline:3px solid #e0b630 !important;outline-offset:2px;animation:hlBlink 1s ease-in-out infinite;border-radius:8px}
+@keyframes hlBlink{50%{outline-color:rgba(224,182,48,.25)}}
+#intro{
+  position:fixed;inset:0;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:24px 20px calc(24px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(160deg,#2f6f57,#3d8b6e 55%,#7fb89a);color:#fff;text-align:center;
+}
+#introSkip{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));right:14px;border:none;background:rgba(255,255,255,.2);color:#fff;border-radius:16px;padding:6px 14px}
+#introCard{max-width:420px}
+.in-icon{font-size:72px;line-height:1.1}
+.in-title{font-size:22px;font-weight:800;margin:14px 0 10px}
+#introCard p{font-size:15px;line-height:1.7;margin:0;opacity:.95}
+#introDots{display:flex;gap:8px;margin:22px 0}
+#introDots i{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.4)}
+#introDots i.on{background:#fff}
+.in-btns{display:flex;gap:12px;width:100%;max-width:420px}
+.in-btns button{flex:1 1 0;padding:13px;border-radius:12px;border:none;font-weight:700;font-size:15px}
+#introPrev{background:rgba(255,255,255,.2);color:#fff}
+#introNext{background:#fff;color:var(--accent-d)}
+#helpBox{
+  position:fixed;inset:0;z-index:35;overflow-y:auto;background:var(--bg);
+  padding:calc(12px + env(safe-area-inset-top,0px)) 16px calc(20px + env(safe-area-inset-bottom,0px));
+}
+.hb-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:17px}
+#helpClose{border:1px solid var(--accent);background:var(--bg);color:var(--accent);border-radius:8px;padding:6px 14px;font-weight:700}
+#helpList details{border-bottom:1px solid var(--line);padding:4px 0}
+#helpList summary{padding:10px 2px;font-weight:700;cursor:pointer}
+#helpList p{margin:0 2px 12px;font-size:14px;line-height:1.7;color:var(--fg)}
 .cond{
   display:block;width:100%;text-align:left;
   border:none;background:none;padding:2px 2px 8px;

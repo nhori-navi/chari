@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=11" rel="stylesheet">
+<link href="style.css?v=12" rel="stylesheet">
 </head>
 <body>
 
@@ -30,6 +30,7 @@
   <button id="btn3d" class="ride-only txt" title="地図の向き">北↑</button>
   <button id="btnJourney" class="no-ride txt" title="バーチャル長距離の旅">旅</button>
   <button id="btnHist" class="no-ride txt" title="走行の履歴">履歴</button>
+  <button id="btnHelp3" class="no-ride txt" title="使い方">？</button>
   <button id="btnLocate" title="現在地">◎</button>
   <button id="btnSettings" title="設定">⚙</button>
 </header>
@@ -39,6 +40,10 @@
 
   <!-- 地点を指定する画面 -->
   <div id="editArea">
+    <div id="helpRow">
+      <label><input type="checkbox" id="helpOn"> 使い方ナビ</label>
+      <button id="btnHelp">？ 使い方</button>
+    </div>
     <button id="btnBackResult" class="back" hidden>‹ ルートの表示に戻る</button>
 
     <button id="condLine" class="cond"></button>
@@ -120,7 +125,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版11）</span>
+    <span class="ver">段階1 試作（版12）</span>
   </footer>
 </section>
 
@@ -159,6 +164,28 @@
   <ul id="jpList"></ul>
   <p class="hint">これまでの走行記録の合計距離で、短いコースから順に進みます。1つ制覇すると次のコースが開きます。距離は代表的な地点を結んだ目安です。</p>
 </section>
+
+<!-- 使い方ナビの吹き出し -->
+<div id="tip" hidden><span id="tipText"></span><button id="tipClose" title="閉じる">×</button></div>
+
+<!-- はじめての紹介 -->
+<div id="intro" hidden>
+  <button id="introSkip">飛ばす</button>
+  <div id="introCard"></div>
+  <div id="introDots"></div>
+  <div class="in-btns">
+    <button id="introPrev">戻る</button>
+    <button id="introNext">次へ</button>
+  </div>
+</div>
+
+<!-- ヘルプ -->
+<div id="helpBox" hidden>
+  <div class="hb-head"><b>ChariMiru の使い方</b><button id="helpClose">閉じる</button></div>
+  <div id="helpList"></div>
+  <button id="helpIntro" class="wide-btn">はじめての紹介をもう一度</button>
+  <button id="helpRestart" class="wide-btn">使い方ナビを最初から</button>
+</div>
 
 <!-- マス・峠を表示中の札 -->
 <div id="playChip" hidden><span id="playChipText"></span><button id="playChipClose" title="消す">×</button></div>
@@ -274,6 +301,7 @@
       <p class="hint">到着予定は「平均速度」と「登りの量」から計算した目安です。空欄なら、履歴から計算した自分の速さ（なければ自転車の種類ごとの標準の速度）を使います。</p>
       <p id="learnedNote" class="hint"></p>
     </div>
+    <button id="btnHelp2" class="wide-btn">？ 使い方（ヘルプ）</button>
     <button id="btnOpenSensor" class="wide-btn">⟳ センサー（Bluetooth）をつなぐ・タイヤの周長</button>
     <button id="btnSaveSettings" class="primary wide-btn">保存</button>
     <button class="close" data-close>閉じる</button>
@@ -281,13 +309,14 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=11"></script>
-<script src="elev.js?v=11"></script>
-<script src="app.js?v=11"></script>
-<script src="sensor.js?v=11"></script>
-<script src="ride.js?v=11"></script>
-<script src="hist.js?v=11"></script>
-<script src="journey.js?v=11"></script>
-<script src="play.js?v=11"></script>
+<script src="config.js?v=12"></script>
+<script src="elev.js?v=12"></script>
+<script src="app.js?v=12"></script>
+<script src="sensor.js?v=12"></script>
+<script src="ride.js?v=12"></script>
+<script src="hist.js?v=12"></script>
+<script src="journey.js?v=12"></script>
+<script src="play.js?v=12"></script>
+<script src="help.js?v=12"></script>
 </body>
 </html>
