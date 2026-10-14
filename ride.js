@@ -74,15 +74,20 @@ function onOrient(e) {
 }
 
 // 今使う向き：走っていればGPSの移動の向き、遅ければコンパス
+// 「走っている」と言えるか：速さが十分・位置の精度がよい・自動一時停止していない・向きが新しい
+function movingForHeading() {
+  return !!ride && ride.spd >= COMPASS_BELOW_KMH && ride.course != null && !ride.autoPaused &&
+    (ride.lastAcc || 999) <= 25 && Date.now() - (ride.courseT || 0) < 6000;
+}
 function headingNow() {
   if (!ride) return null;
-  if (ride.spd >= COMPASS_BELOW_KMH && ride.course != null) return ride.course;
+  if (movingForHeading()) return ride.course;
   if (compass != null) return compass;
   return ride.course;
 }
 
 function onCompassTick() {
-  if (ride.spd >= COMPASS_BELOW_KMH) return;
+  if (movingForHeading()) return; // 走っている間はGPSの移動の向き
   if (rideMarker) rideMarker.setRotation(compass);
   if (!follow || viewMode === 'north' || !ride.pos) return;
   const now = Date.now();
@@ -422,8 +427,10 @@ function onFix(p) {
   if (ride.last) d = haversine(ride.last, pos);
 
   // 速度（GPSが出す値。無ければ移動距離から計算）
+  ride.lastAcc = acc;
   let spd = (c.speed != null && c.speed >= 0) ? c.speed * 3.6 : null;
-  if (spd == null) spd = (ride.last && gapMs > 0 && !gap) ? d / (gapMs / 1000) * 3.6 : 0;
+  // GPSが速度を出さないとき、位置の動きから計算するのは精度がよいときだけ（家の中などのぶれで「走っている」ことにしない）
+  if (spd == null) spd = (ride.last && gapMs > 0 && !gap && acc <= 20) ? d / (gapMs / 1000) * 3.6 : 0;
   if (spd > 90) spd = ride.spd; // あり得ない値は捨てる
   // スピードセンサーがあればそちらを使う（GPSより正確）
   const ss = typeof sensorSpd === 'function' ? sensorSpd() : null;
@@ -466,17 +473,18 @@ function onFix(p) {
     if (!ride.autoPaused) ride.movingMs += Math.min(gapMs, 10000);
     if (!ride.autoPaused) {
       if (wa) ride.dist += dw;
-      else if (d >= 3) ride.dist += d;
+      else if (d >= 3 && ride.spd >= AUTO_PAUSE_KMH) ride.dist += d; // 止まっている間のぶれは足さない
     }
     if (!ride.autoPaused && d >= 3) moved = true;
   }
   ride.prevFixT = t;
 
   if (moved) {
-    if (ride.last && d >= 8) ride.course = bearing(ride.last, pos);
+    if (ride.last && d >= 8 && acc <= 25) { ride.course = bearing(ride.last, pos); ride.courseT = Date.now(); }
     ride.last = pos;
-  } else if (c.heading != null && !isNaN(c.heading) && ride.spd > 5) {
+  } else if (c.heading != null && !isNaN(c.heading) && c.heading >= 0 && ride.spd > 5) {
     ride.course = c.heading;
+    ride.courseT = Date.now();
   }
   if (acc <= 25 && spd < 80 && !ride.autoPaused) ride.maxSpd = Math.max(ride.maxSpd, ride.spd);
   // 心拍とケイデンス（走っている間だけ平均に入れる）
