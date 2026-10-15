@@ -301,6 +301,26 @@ body.ride-full #topbar #btnVoice{margin-left:auto}
 body.riding #btnSettings{display:none}
 #topbar button.txt{font-size:14px;font-weight:800}
 #topbar button.on{background:var(--accent);color:#fff}
+body:not(.touch) #btnLock{display:none !important}
+body.locked #btnLock{visibility:hidden}
+#lockLayer{
+  position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.04);
+  touch-action:none;-webkit-user-select:none;user-select:none;
+}
+#unlockBtn{
+  position:absolute;right:10px;top:calc(8px + env(safe-area-inset-top,0px));
+  width:52px;height:52px;border-radius:50%;border:none;overflow:hidden;
+  background:#c0392b;color:#fff;font-size:22px;box-shadow:0 1px 6px rgba(0,0,0,.4);
+  touch-action:none;
+}
+#unlockBtn span{position:relative;z-index:1}
+#unlockBtn i{position:absolute;left:0;bottom:0;width:100%;height:0;background:rgba(255,255,255,.45)}
+#unlockBtn.holding i{animation:unlockFill 1.5s linear forwards}
+@keyframes unlockFill{to{height:100%}}
+.lock-msg{
+  position:absolute;right:10px;top:calc(66px + env(safe-area-inset-top,0px));
+  background:rgba(0,0,0,.65);color:#fff;font-size:12px;padding:4px 10px;border-radius:12px;
+}
 .ride-pos{width:30px;height:30px}
 .ride-pos svg{display:block;filter:drop-shadow(0 1px 3px rgba(0,0,0,.4))}
 #doneBody .stats{margin-top:4px}

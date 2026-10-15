@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=13" rel="stylesheet">
+<link href="style.css?v=14" rel="stylesheet">
 </head>
 <body>
 
@@ -26,6 +26,7 @@
     <div class="rc-sub"><span id="rcDist">0.00 km</span>　<span id="rcTime">0:00:00</span></div>
     <div id="rcSensor" class="rc-sensor"></div>
   </div>
+  <button id="btnLock" class="ride-only" title="タッチロック">🔒</button>
   <button id="btnVoice" class="ride-only" title="音声案内">🔊</button>
   <button id="btn3d" class="ride-only txt" title="地図の向き">北↑</button>
   <button id="btnJourney" class="no-ride txt" title="バーチャル長距離の旅">旅</button>
@@ -114,6 +115,7 @@
     <div class="toggle-row">
       <button id="btnReroute" class="toggle-btn route-only">自動で引き直す：オン</button>
       <button id="btnRideSensor" class="toggle-btn">センサーをつなぐ</button>
+      <button id="btnWake" class="toggle-btn on">画面ON：入</button>
     </div>
     <div id="rdNote" class="hint"></div>
     <div class="ride-btns">
@@ -125,7 +127,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版13）</span>
+    <span class="ver">段階1 試作（版14）</span>
   </footer>
 </section>
 
@@ -164,6 +166,23 @@
   <ul id="jpList"></ul>
   <p class="hint">これまでの走行記録の合計距離で、短いコースから順に進みます。1つ制覇すると次のコースが開きます。距離は代表的な地点を結んだ目安です。</p>
 </section>
+
+<!-- タッチロック -->
+<div id="lockLayer" hidden>
+  <button id="unlockBtn" title="長押しで解除"><span>🔒</span><i></i></button>
+  <div class="lock-msg">ロック中：右上の🔒を長押しで解除</div>
+</div>
+
+<!-- 出発地から遠いとき -->
+<div id="farModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">出発地から離れています</div>
+    <p id="farText" class="hint"></p>
+    <button id="farGo" class="primary wide-btn">出発地まで案内する（現在地 → 出発地 → 目的地）</button>
+    <button id="farKeep" class="wide-btn">このまま走る（近くのルートに合流したら案内）</button>
+    <button class="close" data-close>やめる</button>
+  </div>
+</div>
 
 <!-- 使い方ナビの吹き出し -->
 <div id="tip" hidden><span id="tipText"></span><button id="tipClose" title="閉じる">×</button></div>
@@ -309,14 +328,14 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=13"></script>
-<script src="elev.js?v=13"></script>
-<script src="app.js?v=13"></script>
-<script src="sensor.js?v=13"></script>
-<script src="ride.js?v=13"></script>
-<script src="hist.js?v=13"></script>
-<script src="journey.js?v=13"></script>
-<script src="play.js?v=13"></script>
-<script src="help.js?v=13"></script>
+<script src="config.js?v=14"></script>
+<script src="elev.js?v=14"></script>
+<script src="app.js?v=14"></script>
+<script src="sensor.js?v=14"></script>
+<script src="ride.js?v=14"></script>
+<script src="hist.js?v=14"></script>
+<script src="journey.js?v=14"></script>
+<script src="play.js?v=14"></script>
+<script src="help.js?v=14"></script>
 </body>
 </html>

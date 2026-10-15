@@ -284,9 +284,10 @@ async function reroute(pos) {
     ride.points = state.points;
     setRouteLayer(route);
     renderPoints();
-    updateMarkers();
     prepRoute();
     ride.progIdx = 0;
+    ride.viaHidden = 0;
+    updateMarkers(); // 新しいルートでの位置に合わせてから描く
     ride.offRoute = false;
     ride.offCount = 0;
     ride.offSince = null;
@@ -300,6 +301,48 @@ async function reroute(pos) {
     rerouting = false;
   }
 }
+
+function updWakeBtn() {
+  $('#btnWake').textContent = '画面ON：' + (wakeOn ? '入' : '切');
+  $('#btnWake').classList.toggle('on', wakeOn);
+}
+$('#btnWake').addEventListener('click', () => {
+  wakeOn = !wakeOn;
+  updWakeBtn();
+  if (wakeOn) { requestWake(); setNote(''); }
+  else {
+    if (wakeLock) { try { wakeLock.release(); } catch (e) { /* 無視 */ } wakeLock = null; }
+    setNote('画面ONを切りました。画面が消えると記録が止まります');
+  }
+});
+
+// タッチロック：画面全体を触れなくする。右上の🔒を1.5秒長押しで解除
+const IS_TOUCH = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+if (IS_TOUCH) document.body.classList.add('touch');
+let lockTimer = null;
+function setLock(on) {
+  $('#lockLayer').hidden = !on;
+  document.body.classList.toggle('locked', on);
+  if (on) speak('タッチロックしました。鍵のボタンを長押しで解除します');
+}
+$('#btnLock').addEventListener('click', () => setLock(true));
+const ul = $('#unlockBtn');
+ul.addEventListener('pointerdown', e => {
+  e.preventDefault();
+  ul.classList.add('holding');
+  clearTimeout(lockTimer);
+  lockTimer = setTimeout(() => { ul.classList.remove('holding'); setLock(false); speak('ロックを解除しました'); }, 1500);
+});
+['pointerup', 'pointerleave', 'pointercancel'].forEach(n => ul.addEventListener(n, () => {
+  clearTimeout(lockTimer);
+  ul.classList.remove('holding');
+}));
+// ロック中は、ほかの所を触っても何も起きない（地図も動かない）
+['pointerdown', 'touchstart', 'click', 'contextmenu'].forEach(n => $('#lockLayer').addEventListener(n, e => {
+  if (e.target.closest('#unlockBtn')) return;
+  e.preventDefault();
+  e.stopPropagation();
+}, { passive: false }));
 
 function updRerouteBtn() {
   $('#btnReroute').textContent = '自動で引き直す：' + (autoReroute ? 'オン' : 'オフ');
@@ -341,16 +384,97 @@ function routeLabel() {
   return pts.length >= 2 ? `${pts[0].name} → ${pts[pts.length - 1].name}` : null;
 }
 
-function startRide(withRoute) {
+// 走る前の計画（元の地点とルート）。走り終わったらこれに戻す
+let plannedRoute = null;
+const clonePts = pts => pts.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
+
+// 走行中に隠す印：S（出発地）と、通り過ぎた経由地
+function rideMarkerHidden(i, n) {
+  if (i === 0) return true;
+  if (i === n - 1) return false;
+  const r = state.route;
+  if (!ride || !ride.withRoute || !rr || !r || !r.wpD || r.wpD[i] == null) return false;
+  return r.wpD[i] <= rr.S[ride.progIdx].d + 20;
+}
+function hiddenViaCount() {
+  let c = 0;
+  for (let i = 1; i < state.points.length - 1; i++) if (rideMarkerHidden(i, state.points.length)) c++;
+  return c;
+}
+
+// iPhoneは、ボタンを押した直後でないと音声を出せないので、先に無音で鳴らしておく
+function primeSpeech() {
+  try {
+    if (!('speechSynthesis' in window)) return;
+    const u = new SpeechSynthesisUtterance(' ');
+    u.volume = 0;
+    speechSynthesis.speak(u);
+  } catch (e) { /* 無視 */ }
+}
+
+// 「▶ 走る」：現在地が出発地から300m以上離れていたら、出発地まで案内するか聞く
+let farHere = null;
+async function onRideButton() {
+  primeSpeech();
+  enableCompass();
+  if (!state.route) { startRide(false); return; }
+  let here = null;
+  msg('現在地を確かめています…');
+  try { here = await getHere(); } catch (e) { here = null; }
+  msg('');
+  const s = state.points.find(p => p.lng != null);
+  const dist = here && s ? haversine([here.lng, here.lat], [s.lng, s.lat]) : 0;
+  if (dist > 300) {
+    farHere = here;
+    $('#farText').textContent = `現在地は、出発地（${s.name}）から約${fmtM(dist)}離れています。`;
+    openModal('#farModal');
+    return;
+  }
+  startRide(true);
+}
+$('#farGo').addEventListener('click', async () => {
+  closeModals();
+  const plan = { points: clonePts(state.points), route: state.route };
+  const pts = [{ name: '現在地', lng: farHere.lng, lat: farHere.lat }, ...clonePts(state.points.filter(p => p.lng != null))];
+  msg('出発地までの道を調べています…');
+  try {
+    const res = await fetchRoute(pts.map(p => [p.lng, p.lat]));
+    const f = res.j.features && res.j.features[0];
+    if (!f) throw new Error('結果が空でした');
+    const route = await makeRoute(f, true);
+    route.wpPts = pts;
+    state.route = route;
+    state.points = clonePts(pts);
+    setRouteLayer(route);
+    renderPoints();
+    msg('');
+    startRide(true, plan);
+  } catch (e) {
+    msg('出発地までの道を調べられませんでした。このまま走ります', true);
+    startRide(true, plan);
+  }
+});
+$('#farKeep').addEventListener('click', () => { closeModals(); startRide(true); });
+
+function planLabel(pts) {
+  const ps = pts.filter(p => p.lng != null);
+  return ps.length >= 2 ? `${ps[0].name} → ${ps[ps.length - 1].name}` : null;
+}
+
+function startRide(withRoute, plan) {
   if (!navigator.geolocation) { msg('この端末では位置情報が使えません', true); return; }
   if (withRoute && !state.route) withRoute = false;
+  plan = plan || { points: clonePts(state.points), route: state.route };
+  plannedRoute = withRoute ? plan.route : null;
   // iPhoneでは、最初の音声はボタンを押した直後に出す必要がある
   speak(withRoute ? 'ルート案内と記録を始めます' : '記録を始めます');
   enableCompass();
   ride = {
     start: Date.now(), withRoute,
-    routeName: withRoute ? routeLabel() : null,
+    routeName: withRoute ? planLabel(plan.points) : null,
     points: withRoute ? state.points : null,
+    planPoints: withRoute ? plan.points : null,
+    viaHidden: 0,
     bike: state.bike,
     track: [], dist: 0, movingMs: 0, maxSpd: 0, up: 0, down: 0,
     paused: false, autoPaused: false, slowSince: null,
@@ -380,6 +504,8 @@ function beginRide() {
   updVoiceBtn();
   upd3dBtn();
   updRerouteBtn();
+  wakeOn = true;
+  updWakeBtn();
   apply3d(true);
   startWatch();
   requestWake();
@@ -398,7 +524,9 @@ function onFixErr(e) {
   setStatus(e && e.code === 1 ? '位置情報の利用が許可されていません（設定を確認してください）' : 'GPSの電波を探しています…', true);
 }
 
+let wakeOn = true;
 async function requestWake() {
+  if (!wakeOn) return;
   try {
     if ('wakeLock' in navigator) {
       wakeLock = await navigator.wakeLock.request('screen');
@@ -500,6 +628,8 @@ function onFix(p) {
     if (onSample) {
       const prog = onSample.d;
       checkTurnVoice(prog);
+      const vh = hiddenViaCount();
+      if (vh !== ride.viaHidden) { ride.viaHidden = vh; updateMarkers(); }
       checkClimbVoice(prog);
       if (!ride.arrived && rr.total - prog < 60 && haversine(pos, [rr.end.lng, rr.end.lat]) < 50) {
         ride.arrived = true;
@@ -760,8 +890,10 @@ async function endRide(save) {
   if (!ride) return;
   stopHardware();
   const rec = toRecord(ride, Date.now());
+  const planPts = ride.withRoute ? ride.planPoints : null;
   ride = null;
   riding = false;
+  setLock(false);
   try { localStorage.removeItem(RIDE_KEY); } catch (e) { /* 無視 */ }
   document.body.classList.remove('riding');
   if (rideMarker) rideMarker.remove();
@@ -769,6 +901,19 @@ async function endRide(save) {
   if (mapReady && map.getSource('ride')) map.getSource('ride').setData({ type: 'FeatureCollection', features: [] });
   if (map.getLayer && map.getLayer('bld3d')) { try { map.setLayoutProperty('bld3d', 'visibility', 'none'); } catch (e) { /* 無視 */ } }
   map.easeTo({ pitch: 0, bearing: 0, duration: 500 });
+  // 引き直したルートは走行中だけのもの。走る前のルートに戻す
+  if (planPts) {
+    state.points = clonePts(planPts);
+    renderPoints();
+    if (plannedRoute) {
+      state.route = plannedRoute;
+      setRouteLayer(plannedRoute);
+      updateResult();
+    } else if (canSearch()) {
+      searchRoute();
+    }
+  }
+  plannedRoute = null;
   updateMarkers();
   setMode(state.route ? 'result' : 'edit');
   if (!save) { speak('記録を保存せずに終了しました'); msg('記録を保存せずに終了しました'); return; }
@@ -881,6 +1026,7 @@ async function checkResume() {
   ride = saved;
   ride.slowSince = null;
   if (ride.withRoute && ride.points) {
+    if (!ride.planPoints) ride.planPoints = clonePts(ride.points);
     state.points = ride.points;
     if (BIKES[ride.bike]) state.bike = ride.bike;
     renderPoints();
@@ -893,8 +1039,8 @@ async function checkResume() {
 }
 
 // ---------- ボタン ----------
-$('#btnRide').addEventListener('click', () => startRide(true));
-$('#btnFreeRide').addEventListener('click', () => startRide(false));
+$('#btnRide').addEventListener('click', onRideButton);
+$('#btnFreeRide').addEventListener('click', () => { primeSpeech(); startRide(false); });
 
 // 地図の準備ができたら、途中の記録がないか確かめる
 if (mapReady) checkResume(); else map.on('load', () => setTimeout(checkResume, 0));

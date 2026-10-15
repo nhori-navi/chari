@@ -152,6 +152,7 @@ function updateMarkers() {
   const n = state.points.length;
   state.points.forEach((p, i) => {
     if (p.lng == null) return;
+    if (riding && typeof rideMarkerHidden === 'function' && rideMarkerHidden(i, n)) return;
     const el = document.createElement('div');
     el.className = 'mk ' + (i === 0 ? 'mk-s' : i === n - 1 ? 'mk-g' : 'mk-v');
     el.textContent = i === 0 ? 'S' : i === n - 1 ? 'G' : String(i);
