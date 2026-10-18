@@ -543,17 +543,30 @@ $('#btnSaveSettings').addEventListener('click', () => {
 // ---------- ルート検索 ----------
 let searchSeq = 0;
 
+// ルート検索のサーバーは、ときどき返事をしないまま止まることがあるので、15秒で打ち切る
+const ORS_TIMEOUT = 15000;
 async function orsRoute(profile, body) {
-  const r = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
-    method: 'POST',
-    headers: {
-      'Authorization': CONFIG.ORS_KEY,
-      'Content-Type': 'application/json',
-      'Accept': 'application/geo+json, application/json'
-    },
-    body: JSON.stringify(body)
-  });
-  const j = await r.json().catch(() => ({}));
+  const ctl = new AbortController();
+  const tm = setTimeout(() => ctl.abort(), ORS_TIMEOUT);
+  let r, j;
+  try {
+    r = await fetch(`https://api.openrouteservice.org/v2/directions/${profile}/geojson`, {
+      method: 'POST',
+      headers: {
+        'Authorization': CONFIG.ORS_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'application/geo+json, application/json'
+      },
+      body: JSON.stringify(body),
+      signal: ctl.signal
+    });
+    j = await r.json().catch(() => ({}));
+  } catch (e) {
+    if (e && e.name === 'AbortError') throw new Error('時間切れ（ルート検索のサーバーの返事がありません）');
+    throw new Error('通信できませんでした');
+  } finally {
+    clearTimeout(tm);
+  }
   if (!r.ok) {
     let m = j.error ? (j.error.message || j.error) : `エラー ${r.status}`;
     if (typeof m !== 'string') m = JSON.stringify(m);
@@ -575,6 +588,8 @@ async function fetchRoute(coordinates, pref) {
   try {
     return { j: await orsRoute(bike.profile, full), note: '' };
   } catch (e1) {
+    // 時間切れのときは同じ条件で、それ以外は条件を外して、もう一度だけ頼む
+    if (/時間切れ/.test(e1.message)) return { j: await orsRoute(bike.profile, full), note: '' };
     const j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: true, preference });
     return { j, note: '※一部の条件（坂を避ける・階段を避ける等）を外して検索しました' };
   }
@@ -590,17 +605,17 @@ async function searchRoute() {
   $('#btnSearch').hidden = true;
   msg('ルートを検索中…');
   const pts = state.points.filter(p => p.lng != null);
-  let res, alt = null;
+  let res;
   const coords = pts.map(p => [p.lng, p.lat]);
   // 比べる相手：「速さ優先」なら「走りやすさ優先」、それ以外なら「速さ優先」
   const altPref = state.pref === 'fast' ? 'easy' : 'fast';
   const altP = fetchRoute(coords, altPref).catch(() => null);
   try {
-    res = await fetchRoute(coords);
-    alt = await altP;
+    res = await fetchRoute(coords); // 2本目（altP）は待たない。届いたらあとで足す
   } catch (e2) {
     if (seq === searchSeq) {
-      msg('ルートが見つかりませんでした：' + e2.message, true);
+      const net = /時間切れ|通信/.test(e2.message);
+      msg((net ? 'ルートを検索できませんでした：' : 'ルートが見つかりませんでした：') + e2.message + (net ? '。少し待って「再検索」を押してください' : ''), true);
       setMode('edit');
       $('#btnSearch').hidden = false; // 失敗したときだけ「再検索」を出す
     }
@@ -616,20 +631,22 @@ async function searchRoute() {
     if (seq !== searchSeq || riding) return;
     route.wpPts = pts.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
     route.pref = state.pref;
-    const routes = [route];
-    const fa = alt && alt.j.features && alt.j.features[0];
-    if (fa) {
-      try {
-        const r2 = await makeRoute(fa, true);
-        r2.wpPts = route.wpPts;
-        r2.pref = altPref;
-        if (!sameRoute(route, r2)) routes.push(r2);
-      } catch (e) { /* もう1本は出さない */ }
-    }
-    if (seq !== searchSeq || riding) return;
-    state.routes = routes;
+    state.routes = [route];
     state.routeIdx = 0;
     showRoute(route);
+    // 比べるもう1本：届いたら足す（届かなくても1本目はそのまま使える）
+    altP.then(async a => {
+      const fa = a && a.j.features && a.j.features[0];
+      if (!fa || seq !== searchSeq || riding || state.route !== route) return;
+      const r2 = await makeRoute(fa, true);
+      if (seq !== searchSeq || riding || state.route !== route) return;
+      r2.wpPts = route.wpPts;
+      r2.pref = altPref;
+      if (sameRoute(route, r2)) return;
+      state.routes = [route, r2];
+      renderRouteChoice();
+      updAltLayer();
+    }).catch(() => { /* もう1本は出さない */ });
     const notes = [res.note];
     if (route.elevSrc !== 'gsi') notes.push('※国土地理院の標高が取れなかったため、坂は粗いデータで表示しています');
     msg(notes.filter(Boolean).join(' '));
