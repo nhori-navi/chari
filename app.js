@@ -704,22 +704,28 @@ async function searchRoute() {
     route.pref = state.pref;
     state.routes = [route];
     state.routeIdx = 0;
+    const viaMb = res.src === 'mapbox' && pts.length > 2;
+    state.altNote = viaMb ? '比べるもう1本：経由地があるため、予備の検索では1本だけです' :
+      (res.src === 'mapbox' && !res.alt) ? '比べるもう1本：別の道は見つかりませんでした' : '比べるもう1本を調べています…';
     showRoute(route);
     // 比べるもう1本：届いたら足す（届かなくても1本目はそのまま使える）
     const altSrc = res.src === 'mapbox' ? Promise.resolve({ j: { features: [res.alt] }, mb: true }) : altP;
+    const altDone = note => { if (seq === searchSeq && state.route === route && state.routes.length < 2) { state.altNote = note; renderRouteChoice(); } };
     altSrc.then(async a => {
       const fa = a && a.j.features && a.j.features[0];
-      if (!fa || seq !== searchSeq || riding || state.route !== route) return;
+      if (!fa) { if (res.src !== 'mapbox') altDone('比べるもう1本：取れませんでした（ルート検索のサーバーの不調）'); return; }
+      if (seq !== searchSeq || riding || state.route !== route) return;
       const r2 = await makeRoute(fa, true);
       if (seq !== searchSeq || riding || state.route !== route) return;
       r2.wpPts = route.wpPts;
       r2.pref = a.mb ? state.pref : altPref;
       if (a.mb) { r2.label = 'Mapboxの別ルート'; route.label = 'Mapboxのルート'; }
-      if (sameRoute(route, r2)) return;
+      if (sameRoute(route, r2)) { altDone(`比べるもう1本（${r2.label || PREFS[r2.pref]}）は、ほとんど同じ道でした`); return; }
+      state.altNote = '';
       state.routes = [route, r2];
       renderRouteChoice();
       updAltLayer();
-    }).catch(() => { /* もう1本は出さない */ });
+    }).catch(() => altDone('比べるもう1本：取れませんでした'));
     const notes = [res.note];
     if (route.elevSrc !== 'gsi') notes.push('※国土地理院の標高が取れなかったため、坂は粗いデータで表示しています');
     msg(notes.filter(Boolean).join(' '));
@@ -755,7 +761,13 @@ function routeMinutes(r) {
 // 比べるルートの切り替えボタンと、地図の灰色の線
 function renderRouteChoice() {
   const box = $('#routeChoice');
-  if (state.routes.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+  if (state.routes.length < 2) {
+    // 1本だけのときは、その理由を小さく出す（調べている途中・同じ道だった・取れなかった）
+    const note = state.route && !state.route.fromTrack ? state.altNote : '';
+    box.hidden = !note;
+    box.innerHTML = note ? `<div class="alt-note">${esc(note)}</div>` : '';
+    return;
+  }
   box.hidden = false;
   box.innerHTML = state.routes.map((r, i) =>
     `<button data-i="${i}" class="${i === state.routeIdx ? 'on' : ''}"><b>${'AB'[i]}</b> ${esc(r.label || PREFS[r.pref] || '')}<br>` +
