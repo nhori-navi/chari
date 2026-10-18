@@ -544,7 +544,7 @@ $('#btnSaveSettings').addEventListener('click', () => {
 let searchSeq = 0;
 
 // ルート検索のサーバーは、ときどき返事をしないまま止まることがあるので、15秒で打ち切る
-const ORS_TIMEOUT = 15000;
+const ORS_TIMEOUT = 10000;
 async function orsRoute(profile, body) {
   const ctl = new AbortController();
   const tm = setTimeout(() => ctl.abort(), ORS_TIMEOUT);
@@ -576,7 +576,77 @@ async function orsRoute(profile, body) {
 }
 
 // ORSにルートを頼む（細かい条件が通らなければ条件を外してもう一度）
-async function fetchRoute(coordinates, pref) {
+// ---------- 予備のルート検索：Mapbox の自転車ルート ----------
+// OpenRouteService が止まっている（時間切れ・通信できない・サーバーの不調）ときに使う。
+// 好み（走りやすさ・速さ・坂）と自転車の種類は反映されないが、別ルートを最大2本返してくれる
+let orsDownUntil = 0; // この時刻までは OpenRouteService を飛ばして Mapbox を使う
+const MB_TURN = { 'left': 0, 'right': 1, 'sharp left': 2, 'sharp right': 3, 'slight left': 4, 'slight right': 5, 'uturn': 9 };
+function nearestIdx(coords, lng, lat, from) {
+  let best = from, bd = Infinity;
+  for (let i = from; i < coords.length; i++) {
+    const dx = (coords[i][0] - lng) * 90000, dy = (coords[i][1] - lat) * 111000;
+    const d = dx * dx + dy * dy;
+    if (d < bd) { bd = d; best = i; }
+    if (d < 4 && i > from) break; // 2m 以内に来たらそこで決まり
+  }
+  return best;
+}
+// Mapbox の答えを、OpenRouteService と同じ形（GeoJSON の Feature）に直す
+function mbToFeature(r, wps) {
+  const coords = r.geometry.coordinates.map(c => [c[0], c[1]]);
+  let k = 0;
+  const way_points = wps.map((w, i) => (k = i === 0 ? 0 : nearestIdx(coords, w[0], w[1], k)));
+  way_points[way_points.length - 1] = coords.length - 1;
+  const steps = [];
+  let from = 0;
+  r.legs.forEach(leg => leg.steps.forEach(st => {
+    const m = st.maneuver || {}, loc = m.location || [];
+    const idx = nearestIdx(coords, loc[0], loc[1], from);
+    from = idx;
+    let type = null;
+    if (m.type === 'roundabout' || m.type === 'rotary') type = 7;
+    else if (m.type === 'exit roundabout' || m.type === 'exit rotary') type = 8;
+    else if (!['depart', 'arrive', 'new name', 'notification'].includes(m.type) && MB_TURN[m.modifier] != null) type = MB_TURN[m.modifier];
+    if (type != null) steps.push({ type, name: st.name || '-', way_points: [idx, idx] });
+  }));
+  return { type: 'Feature', properties: { summary: { distance: r.distance }, way_points, segments: [{ steps }] }, geometry: { type: 'LineString', coordinates: coords } };
+}
+async function mapboxRoute(coordinates) {
+  const ctl = new AbortController();
+  const tm = setTimeout(() => ctl.abort(), 12000);
+  try {
+    const path = coordinates.map(c => c[0].toFixed(6) + ',' + c[1].toFixed(6)).join(';');
+    const r = await fetch(`https://api.mapbox.com/directions/v5/mapbox/cycling/${path}?geometries=geojson&overview=full&steps=true&language=ja` +
+      `${coordinates.length === 2 ? '&alternatives=true' : ''}&access_token=${CONFIG.MAPBOX_TOKEN}`, { signal: ctl.signal });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.routes || !j.routes.length) throw new Error(j.message || `エラー ${r.status}`);
+    const feats = j.routes.slice(0, 2).map(x => mbToFeature(x, coordinates));
+    return { j: { type: 'FeatureCollection', features: [feats[0]] }, alt: coordinates.length === 2 ? feats[1] || null : null, src: 'mapbox' };
+  } catch (e) {
+    throw new Error(e && e.name === 'AbortError' ? '時間切れ（予備のルート検索も返事がありません）' : '予備のルート検索もできませんでした（' + e.message + '）');
+  } finally {
+    clearTimeout(tm);
+  }
+}
+const MB_NOTE = '※ルート検索のサーバー（OpenRouteService）が応答しないため、予備のMapboxの自転車ルートで表示しています（好みの条件は反映されません）';
+
+async function fetchRoute(coordinates, pref, orsOnly) {
+  if (!orsOnly && Date.now() < orsDownUntil) {
+    const m = await mapboxRoute(coordinates);
+    return { ...m, note: MB_NOTE };
+  }
+  try {
+    return await fetchOrs(coordinates, pref);
+  } catch (e) {
+    if (orsOnly) throw e;
+    // サーバーが止まっている・混んでいる（時間切れ・通信できない・5xx・回数の上限）なら、5分間は Mapbox に切り替える
+    if (/時間切れ|通信|エラー 5\d\d|エラー 429|Quota|limit/i.test(e.message)) orsDownUntil = Date.now() + 5 * 60000;
+    const m = await mapboxRoute(coordinates);
+    return { ...m, note: MB_NOTE };
+  }
+}
+
+async function fetchOrs(coordinates, pref) {
   pref = pref || state.pref;
   const bike = BIKES[state.bike];
   const preference = pref === 'fast' ? 'fastest' : 'recommended';
@@ -588,8 +658,8 @@ async function fetchRoute(coordinates, pref) {
   try {
     return { j: await orsRoute(bike.profile, full), note: '' };
   } catch (e1) {
-    // 時間切れのときは同じ条件で、それ以外は条件を外して、もう一度だけ頼む
-    if (/時間切れ/.test(e1.message)) return { j: await orsRoute(bike.profile, full), note: '' };
+    // 時間切れ・通信できないときはやり直さない（すぐ予備に切り替える）。それ以外は条件を外してもう一度
+    if (/時間切れ|通信/.test(e1.message)) throw e1;
     const j = await orsRoute(bike.profile, { coordinates, elevation: true, instructions: true, preference });
     return { j, note: '※一部の条件（坂を避ける・階段を避ける等）を外して検索しました' };
   }
@@ -609,7 +679,8 @@ async function searchRoute() {
   const coords = pts.map(p => [p.lng, p.lat]);
   // 比べる相手：「速さ優先」なら「走りやすさ優先」、それ以外なら「速さ優先」
   const altPref = state.pref === 'fast' ? 'easy' : 'fast';
-  const altP = fetchRoute(coords, altPref).catch(() => null);
+  // 比べる相手は OpenRouteService だけで探す（止まっているときは、Mapbox の別ルートを使う）
+  const altP = Date.now() < orsDownUntil ? Promise.resolve(null) : fetchRoute(coords, altPref, true).catch(() => null);
   try {
     res = await fetchRoute(coords); // 2本目（altP）は待たない。届いたらあとで足す
   } catch (e2) {
@@ -635,13 +706,15 @@ async function searchRoute() {
     state.routeIdx = 0;
     showRoute(route);
     // 比べるもう1本：届いたら足す（届かなくても1本目はそのまま使える）
-    altP.then(async a => {
+    const altSrc = res.src === 'mapbox' ? Promise.resolve({ j: { features: [res.alt] }, mb: true }) : altP;
+    altSrc.then(async a => {
       const fa = a && a.j.features && a.j.features[0];
       if (!fa || seq !== searchSeq || riding || state.route !== route) return;
       const r2 = await makeRoute(fa, true);
       if (seq !== searchSeq || riding || state.route !== route) return;
       r2.wpPts = route.wpPts;
-      r2.pref = altPref;
+      r2.pref = a.mb ? state.pref : altPref;
+      if (a.mb) { r2.label = 'Mapboxの別ルート'; route.label = 'Mapboxのルート'; }
       if (sameRoute(route, r2)) return;
       state.routes = [route, r2];
       renderRouteChoice();
@@ -685,7 +758,7 @@ function renderRouteChoice() {
   if (state.routes.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
   box.hidden = false;
   box.innerHTML = state.routes.map((r, i) =>
-    `<button data-i="${i}" class="${i === state.routeIdx ? 'on' : ''}"><b>${'AB'[i]}</b> ${esc(PREFS[r.pref] || '')}<br>` +
+    `<button data-i="${i}" class="${i === state.routeIdx ? 'on' : ''}"><b>${'AB'[i]}</b> ${esc(r.label || PREFS[r.pref] || '')}<br>` +
     `<span>${(r.dist / 1000).toFixed(1)}km・${fmtDur(routeMinutes(r))}・↑${Math.round(r.ascent)}m</span></button>`).join('');
 }
 $('#routeChoice').addEventListener('click', e => {
