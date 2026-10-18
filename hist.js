@@ -138,7 +138,7 @@ function showTrack(r) {
   if (!map.getSource('hist')) {
     map.addSource('hist', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
-      id: 'hist-line', type: 'line', source: 'hist',
+      id: 'hist-line', type: 'line', source: 'hist', slot: 'middle',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
       paint: { 'line-color': '#e07b2e', 'line-width': 4, 'line-opacity': 0.9 }
     });

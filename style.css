@@ -10,15 +10,15 @@
   --fill:rgba(61,139,110,.18);
   --ph:0px;
 }
-@media (prefers-color-scheme: dark){
-  :root{
-    --bg:#1d1f1e;
-    --fg:#eeeeee;
-    --sub:#aaaaaa;
-    --line:#444444;
-    --panel:rgba(29,31,30,.96);
-    --fill:rgba(61,139,110,.30);
-  }
+/* 夜間モード：設定（自動・明・暗）で html に data-theme="dark" を付ける */
+:root[data-theme="dark"]{
+  --bg:#1d1f1e;
+  --fg:#eeeeee;
+  --sub:#aaaaaa;
+  --line:#444444;
+  --panel:rgba(29,31,30,.94);
+  --fill:rgba(61,139,110,.30);
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 [hidden]{display:none !important}
@@ -65,8 +65,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 }
 #panel.collapsed{max-height:130px;overflow:hidden}
 #panelHandle{
-  width:48px;height:6px;border-radius:3px;background:var(--line);
-  margin:6px auto 8px;cursor:pointer;
+  position:relative;width:90px;height:22px;margin:0 auto 4px;cursor:ns-resize;touch-action:none;
+}
+#panelHandle::after{
+  content:'';position:absolute;left:21px;right:21px;top:8px;height:6px;border-radius:3px;background:var(--line);
 }
 @media (min-width:760px){
   #panel{
@@ -77,11 +79,10 @@ button{font:inherit;color:inherit;cursor:pointer}
   #panelHandle{display:none}
 }
 
-/* 地図の著作権表示をパネルの上に出す */
+/* 地図の著作権表示を、パネルに隠れない所に出す（--ph・--pl・--pr は app.js が決める） */
 .mapboxgl-ctrl-bottom-left,.mapboxgl-ctrl-bottom-right{bottom:var(--ph)}
-@media (min-width:760px){
-  .mapboxgl-ctrl-bottom-left{left:410px}
-}
+.mapboxgl-ctrl-bottom-left{left:var(--pl,0px)}
+.mapboxgl-ctrl-bottom-right{right:var(--pr,0px)}
 
 /* 使い方ナビ・紹介・ヘルプ */
 #helpRow{display:flex;justify-content:space-between;align-items:center;margin:0 2px 6px;font-size:13px;color:var(--sub)}
@@ -200,7 +201,22 @@ button{font:inherit;color:inherit;cursor:pointer}
 #panel.mode-result:not(.detail) .sum-btns{margin-top:6px}
 #panel.mode-result:not(.detail) .sum-btns button{padding:7px 4px}
 #panel.mode-result{padding-top:0}
-#panel.mode-result #panelHandle{margin:6px auto 6px}
+#panel.mode-result #panelHandle{margin:0 auto 2px}
+#panel.sized{overflow-y:auto}
+/* 比べるルート（A・B） */
+#routeChoice{display:flex;gap:6px;margin:0 0 6px}
+#routeChoice button{
+  flex:1 1 0;min-width:0;text-align:left;padding:6px 8px;border-radius:8px;
+  border:1px solid var(--line);background:var(--bg);font-size:12px;line-height:1.4;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#routeChoice button b{
+  display:inline-block;width:18px;height:18px;border-radius:50%;background:#7d8a84;color:#fff;
+  text-align:center;font-size:11px;line-height:18px;margin-right:2px;
+}
+#routeChoice button.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+#routeChoice button.on b{background:var(--accent)}
+#routeChoice span{color:var(--sub)}
 #msg:empty{display:none}
 .sum-line{font-size:14px;margin:0 2px 6px;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sum-line b{font-size:19px;color:var(--accent)}
@@ -502,3 +518,33 @@ body.riding #histChip{display:none !important}
 .opts input{accent-color:var(--accent);width:18px;height:18px}
 .speed-row{display:flex;align-items:center;gap:8px}
 .speed-row input{max-width:140px}
+
+/* ===== 版15：横向き・走行中の配置 ===== */
+/* スマホの横向き：パネルは右の列にして、地図を左に広く */
+@media (orientation:landscape) and (max-height:520px){
+  #panel{
+    left:auto;right:calc(8px + env(safe-area-inset-right,0px));
+    top:calc(8px + env(safe-area-inset-top,0px));bottom:auto;
+    width:330px;max-height:calc(100% - 16px);border-radius:14px;overflow-y:auto;
+    padding-bottom:10px;
+  }
+  #panel.collapsed{max-height:calc(100% - 16px);overflow-y:auto}
+  #panelHandle{display:none}
+  #topbar{right:calc(338px + env(safe-area-inset-right,0px));padding-left:calc(10px + env(safe-area-inset-left,0px))}
+  body.riding #topbar,body.journey #topbar{right:env(safe-area-inset-right,0px)}
+  #tip{left:calc(12px + env(safe-area-inset-left,0px));right:350px;margin:0}
+  #journeyPanel{
+    left:auto;right:calc(8px + env(safe-area-inset-right,0px));top:8px;bottom:8px;
+    width:330px;max-height:none;border-radius:14px;
+  }
+  .sheet{max-height:94vh}
+}
+/* 走行中（横向き・パソコン）：地図は全画面、情報は右下の小さな箱 */
+@media (min-width:760px), (orientation:landscape) and (max-height:520px){
+  #panel.mode-ride{
+    left:auto;right:calc(10px + env(safe-area-inset-right,0px));
+    top:auto;bottom:calc(10px + env(safe-area-inset-bottom,0px));
+    width:340px;max-height:calc(100% - 84px);border-radius:14px;overflow-y:auto;
+  }
+  #panel.mode-ride #panelHandle{display:none}
+}

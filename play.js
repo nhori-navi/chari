@@ -41,8 +41,8 @@ function showMeshMap(set) {
   if (!mapReady) return;
   if (!map.getSource('mesh')) {
     map.addSource('mesh', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
-    map.addLayer({ id: 'mesh-fill', type: 'fill', source: 'mesh', paint: { 'fill-color': '#e07b2e', 'fill-opacity': 0.35 } }, 'route-casing');
-    map.addLayer({ id: 'mesh-line', type: 'line', source: 'mesh', paint: { 'line-color': '#c0602a', 'line-width': 0.8 } }, 'route-casing');
+    map.addLayer({ id: 'mesh-fill', type: 'fill', source: 'mesh', slot: 'middle', paint: { 'fill-color': '#e07b2e', 'fill-opacity': 0.35 } }, 'route-casing');
+    map.addLayer({ id: 'mesh-line', type: 'line', source: 'mesh', slot: 'middle', paint: { 'line-color': '#c0602a', 'line-width': 0.8 } }, 'route-casing');
   }
   const fc = meshFC(set);
   map.getSource('mesh').setData(fc);

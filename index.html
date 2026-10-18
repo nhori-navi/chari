@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=14" rel="stylesheet">
+<link href="style.css?v=15" rel="stylesheet">
 </head>
 <body>
 
@@ -64,6 +64,7 @@
   <!-- ルートの結果（結果モード） -->
   <div id="result">
     <div id="sumLine" class="sum-line"></div>
+    <div id="routeChoice" hidden></div>
     <div class="stats detail-only">
       <div><span class="label">距離</span><span id="rDist"></span></div>
       <div><span class="label">所要時間（目安）</span><span id="rTime"></span></div>
@@ -117,6 +118,10 @@
       <button id="btnRideSensor" class="toggle-btn">センサーをつなぐ</button>
       <button id="btnWake" class="toggle-btn on">画面ON：入</button>
     </div>
+    <div class="toggle-row">
+      <button id="btnRideGoal" class="toggle-btn">🔍 目的地を変える</button>
+      <button id="btnRideVia" class="toggle-btn">＋ 寄り道を足す</button>
+    </div>
     <div id="rdNote" class="hint"></div>
     <div class="ride-btns">
       <button id="btnPause">⏸ 一時停止</button>
@@ -127,7 +132,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版14）</span>
+    <span class="ver">段階1 試作（版15）</span>
   </footer>
 </section>
 
@@ -140,6 +145,17 @@
     <ul id="searchResults"></ul>
     <p class="hint">地図を長押し（パソコンは右クリック）しても指定できます</p>
     <button class="close" data-close>閉じる</button>
+  </div>
+</div>
+
+<!-- 走行中の地図の長押しメニュー -->
+<div id="ridePickModal" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-title">走りながら行き先を変える</div>
+    <button class="wide-btn" data-ridepick="goal">ここを目的地にする</button>
+    <button class="wide-btn" data-ridepick="via">ここに寄ってから行く（次の経由地）</button>
+    <p class="hint">現在地からルートを引き直します。止まっている間に操作してください。</p>
+    <button class="close" data-close>やめる</button>
   </div>
 </div>
 
@@ -310,6 +326,11 @@
     <div class="group">
       <div class="glabel">ルートの好み</div>
       <div id="prefOpts" class="opts"></div>
+      <p class="hint">検索のたびに、選んだ好みのルートと、比べるためのもう1本（灰色の線）を出します。</p>
+    </div>
+    <div class="group">
+      <div class="glabel">画面の明るさ（夜間モード）</div>
+      <div id="themeOpts" class="opts"></div>
     </div>
     <div class="group">
       <div class="glabel">平地での平均速度（任意）</div>
@@ -328,14 +349,14 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=14"></script>
-<script src="elev.js?v=14"></script>
-<script src="app.js?v=14"></script>
-<script src="sensor.js?v=14"></script>
-<script src="ride.js?v=14"></script>
-<script src="hist.js?v=14"></script>
-<script src="journey.js?v=14"></script>
-<script src="play.js?v=14"></script>
-<script src="help.js?v=14"></script>
+<script src="config.js?v=15"></script>
+<script src="elev.js?v=15"></script>
+<script src="app.js?v=15"></script>
+<script src="sensor.js?v=15"></script>
+<script src="ride.js?v=15"></script>
+<script src="hist.js?v=15"></script>
+<script src="journey.js?v=15"></script>
+<script src="play.js?v=15"></script>
+<script src="help.js?v=15"></script>
 </body>
 </html>

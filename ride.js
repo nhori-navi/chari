@@ -146,7 +146,7 @@ $('#rdToast').addEventListener('click', () => { if (!statusText) setNote(''); })
 function toggleRideFull() {
   const full = $('#panel').classList.toggle('ride-full');
   document.body.classList.toggle('ride-full', full);
-  if (ride) { renderHud(); if (follow && ride.pos) moveCamera(ride.pos); }
+  if (ride) { renderHud(); setTimeout(() => { if (ride && follow && ride.pos) moveCamera(ride.pos); }, 50); }
 }
 $('#rideBar .rb-text').addEventListener('click', toggleRideFull);
 
@@ -260,28 +260,43 @@ function updProgress(pos, acc, wide, t) {
   return S[best];
 }
 
-async function reroute(pos) {
-  if (!ride || !state.route) return;
+// まだ通っていない経由地と目的地
+function remainingPoints() {
+  if (!ride || !ride.withRoute || !state.route || !rr) return [];
+  const prog = rr.S[ride.progIdx].d;
+  const wp = state.route.wpPts || [];
+  const wpD = state.route.wpD || [];
+  let rest = wp.filter((p, i) => i > 0 && (wpD[i] == null || wpD[i] > prog + 30));
+  if (!rest.length && wp.length) rest = [wp[wp.length - 1]];
+  return rest.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
+}
+
+async function reroute(pos, restOverride, doneText) {
+  if (!ride || (!state.route && !restOverride)) return;
   rerouting = true;
   lastReroute = Date.now();
   setStatus('ルートを引き直しています…');
   try {
-    const prog = rr.S[ride.progIdx].d;
-    const wp = state.route.wpPts || [];
-    const wpD = state.route.wpD || [];
-    // まだ通っていない経由地と目的地
-    let rest = wp.filter((p, i) => i > 0 && (wpD[i] == null || wpD[i] > prog + 30));
-    if (!rest.length && wp.length) rest = [wp[wp.length - 1]];
+    const rest = restOverride || remainingPoints();
     const pts = [{ name: '現在地', lng: pos[0], lat: pos[1] }, ...rest];
-    const res = await fetchRoute(pts.map(p => [p.lng, p.lat]));
+    const pref = (state.route && state.route.pref) || state.pref;
+    const res = await fetchRoute(pts.map(p => [p.lng, p.lat]), pref);
     const f = res.j.features && res.j.features[0];
     if (!f) throw new Error('結果が空でした');
     const route = await makeRoute(f, true);
     if (!ride) return;
     route.wpPts = pts.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
+    route.pref = pref;
     state.route = route;
+    state.routes = [route];
+    state.routeIdx = 0;
     state.points = route.wpPts.map(p => ({ ...p }));
     ride.points = state.points;
+    if (!ride.withRoute) { // ルートなしで走っていたときに行き先を決めた
+      ride.withRoute = true;
+      $('#panel').classList.add('with-route');
+      updRerouteBtn();
+    }
     setRouteLayer(route);
     renderPoints();
     prepRoute();
@@ -292,15 +307,48 @@ async function reroute(pos) {
     ride.offCount = 0;
     ride.offSince = null;
     ride.arrived = false;
-    speak('ルートを引き直しました');
+    speak(doneText || 'ルートを引き直しました');
+    if (follow && ride.pos) moveCamera(ride.pos);
     renderHud();
     persist();
+    return true;
   } catch (e) {
     setStatus('ルートを引き直せませんでした（通信を確認してください）', true);
+    return false;
   } finally {
     rerouting = false;
   }
 }
+
+// ---------- 走行中に行き先を変える（地図の長押し・検索） ----------
+// kind：'goal'＝ここを目的地にする（残りの経由地はそのまま）、'via'＝ここに寄ってから行く（次の経由地）
+async function rideRetarget(kind, lng, lat, name) {
+  if (!ride) return;
+  if (!ride.pos) { setStatus('現在地がまだ分からないため、行き先を変えられません', true); return; }
+  if (rerouting) return;
+  const pt = { name: name || '地図上の地点', lng, lat };
+  let rest = remainingPoints();
+  if (!rest.length) rest = [pt];
+  else if (kind === 'goal') rest[rest.length - 1] = pt;
+  else rest = [pt, ...rest];
+  if (!name) reverseName(lng, lat).then(nm => { pt.name = nm; if (riding) renderPoints(); });
+  const ok = await reroute(ride.pos, rest, kind === 'goal' ? '目的地を変えました' : '寄り道を足しました');
+  if (!ok || !ride) return;
+  // 走り終わったあとに表示する計画も、変えた後の行き先にする（出発地は元のまま）
+  const startPt = (ride.planPoints && ride.planPoints[0]) || { name: '出発地', lng: ride.track[0] ? ride.track[0][2] : ride.pos[0], lat: ride.track[0] ? ride.track[0][1] : ride.pos[1] };
+  ride.planPoints = [startPt, ...rest.map(p => p)];
+  plannedRoute = null; // 走り終わったら、この計画で検索し直す
+  ride.routeName = planLabel(ride.planPoints);
+  persist();
+}
+document.querySelectorAll('[data-ridepick]').forEach(b => b.addEventListener('click', () => {
+  const ll = state.pickLngLat;
+  closeModals();
+  if (ll) rideRetarget(b.dataset.ridepick, ll.lng, ll.lat, null);
+}));
+// 詳しい表示の「目的地を検索で変える」「寄り道を検索で足す」
+$('#btnRideGoal').addEventListener('click', () => { openSearch(0); state.editIndex = 'rideGoal'; $('#searchTitle').textContent = '新しい目的地を検索'; });
+$('#btnRideVia').addEventListener('click', () => { openSearch(0); state.editIndex = 'rideVia'; $('#searchTitle').textContent = '寄り道する場所を検索'; });
 
 function updWakeBtn() {
   $('#btnWake').textContent = '画面ON：' + (wakeOn ? '入' : '切');
@@ -544,6 +592,7 @@ function onFix(p) {
   const pos = [c.longitude, c.latitude];
   const acc = c.accuracy || 999;
   ride.pos = pos;
+  themeAt = pos;
   showRidePos(pos);
 
   if (ride.paused) { ride.last = null; ride.lastWheel = null; ride.prevFixT = t; ride.segBreak = true; renderHud(); return; }
@@ -747,7 +796,7 @@ function ensureRideLayer() {
   if (!mapReady || map.getSource('ride')) return;
   map.addSource('ride', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({
-    id: 'ride-line', type: 'line', source: 'ride',
+    id: 'ride-line', type: 'line', source: 'ride', slot: 'middle',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': '#2a7de1', 'line-width': 4, 'line-opacity': 0.85 }
   });
@@ -768,9 +817,8 @@ function drawRideLine(force) {
 // ---------- 地図の追いかけと3D ----------
 function camOffset(ratio) {
   // パネルに隠れていない部分の、上から ratio の位置に現在地が来るようにする
-  const ph = innerWidth >= 760 ? 0 : $('#panel').offsetHeight;
-  const visible = innerHeight - ph;
-  return [innerWidth >= 760 ? 200 : 0, Math.round(visible * ratio - innerHeight / 2)];
+  const v = visibleRect();
+  return [Math.round((v.left + v.right) / 2 - innerWidth / 2), Math.round(v.top + (v.bottom - v.top) * ratio - innerHeight / 2)];
 }
 function moveCamera(pos) {
   if (!follow || !ride) return;

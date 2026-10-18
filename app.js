@@ -15,7 +15,7 @@ const BIKES = {
   ebike: { name: '電動アシスト', profile: 'cycling-electric', speed: 18, climb: 0.4 }
 };
 const PREFS = {
-  fast: '速さ優先',
+  fast: '速さ優先（大きな道も使う）',
   easy: '走りやすさ優先',
   flat: '坂をなるべく避ける'
 };
@@ -76,15 +76,57 @@ function loadSettings() {
     if (BIKES[s.bike]) state.bike = s.bike;
     if (PREFS[s.pref]) state.pref = s.pref;
     if (s.avgSpeed > 0) state.avgSpeed = s.avgSpeed;
+    if (['auto', 'light', 'dark'].includes(s.theme)) state.theme = s.theme;
   } catch (e) { /* 保存領域が使えない場合は初期値のまま */ }
 }
 function saveSettings() {
   try {
-    localStorage.setItem('chari_settings', JSON.stringify({ bike: state.bike, pref: state.pref, avgSpeed: state.avgSpeed }));
+    localStorage.setItem('chari_settings', JSON.stringify({ bike: state.bike, pref: state.pref, avgSpeed: state.avgSpeed, theme: state.theme }));
   } catch (e) { /* 無視 */ }
 }
 
 let riding = false; // 走行中か（ride.js が切り替える）
+state.theme = 'auto';
+state.routes = [];   // 版15：比べるルート（1〜2本）
+state.routeIdx = 0;
+loadSettings();
+
+// ---------- 夜間モード（MichiMiru と同じ決まり） ----------
+// 太陽の高さ（度）。経度・緯度・時刻から
+function sunAlt(lng, lat, t) {
+  const R = Math.PI / 180, d = (t - 946728000000) / 864e5;
+  const g = (357.529 + 0.98560028 * d) * R, q = 280.459 + 0.98564736 * d;
+  const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * R, e = (23.439 - 0.00000036 * d) * R;
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)), dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const ha = (280.46061837 + 360.98564736629 * d + lng) * R - ra;
+  return Math.asin(Math.sin(lat * R) * Math.sin(dec) + Math.cos(lat * R) * Math.cos(dec) * Math.cos(ha)) / R;
+}
+let themeAt = null; // 明るさの判定に使う場所 [経度, 緯度]
+// {dark：画面を暗くするか, preset：地図の明るさ}。自動は日の入り（−0.83°）から日の出まで暗く、薄明かり（−6°まで）は夕方・明け方の色
+function themeState(t) {
+  if (state.theme === 'light') return { dark: false, preset: 'day' };
+  if (state.theme === 'dark') return { dark: true, preset: 'night' };
+  t = t || Date.now();
+  const p = themeAt || [139.35, 35.64];
+  const a = sunAlt(p[0], p[1], t);
+  if (a >= -0.83) return { dark: false, preset: 'day' };
+  if (a < -6) return { dark: true, preset: 'night' };
+  return { dark: true, preset: sunAlt(p[0], p[1], t + 600000) < a ? 'dusk' : 'dawn' };
+}
+let presetNow = null;
+function applyTheme() {
+  const t = themeState();
+  document.documentElement.dataset.theme = t.dark ? 'dark' : 'light';
+  const mc = document.querySelector('meta[name=theme-color]');
+  if (mc) mc.content = t.dark ? '#1d1f1e' : '#3d8b6e';
+  if (t.preset !== presetNow) {
+    // 地図を作る前（起動直後）や準備がまだのときは、次の判定でやり直す
+    try { map.setConfigProperty('basemap', 'lightPreset', t.preset); presetNow = t.preset; } catch (e) { /* 無視 */ }
+  }
+  if (typeof drawProfile === 'function' && state.route) drawProfile(null);
+}
+applyTheme();
+setInterval(applyTheme, 60000);
 
 const keysOk = !!(CONFIG.MAPBOX_TOKEN && !CONFIG.MAPBOX_TOKEN.includes('ここに') &&
                   CONFIG.ORS_KEY && !CONFIG.ORS_KEY.includes('ここに'));
@@ -93,11 +135,15 @@ const keysOk = !!(CONFIG.MAPBOX_TOKEN && !CONFIG.MAPBOX_TOKEN.includes('ここ�
 mapboxgl.accessToken = CONFIG.MAPBOX_TOKEN;
 const map = new mapboxgl.Map({
   container: 'map',
-  style: 'mapbox://styles/mapbox/streets-v12',
+  style: 'mapbox://styles/mapbox/standard',
   center: [139.35, 35.64],
   zoom: 11,
+  language: 'ja',
+  config: { basemap: { lightPreset: themeState().preset } }, // 夜は初めから夜の地図で開く（白く光らないように）
   attributionControl: false
 });
+presetNow = themeState().preset;
+map.on('style.load', () => { presetNow = null; applyTheme(); });
 map.addControl(new mapboxgl.AttributionControl({
   compact: true,
   customAttribution: 'ルート: © openrouteservice.org / © OpenStreetMap contributors / 標高: 国土地理院'
@@ -108,10 +154,22 @@ map.touchZoomRotate.disableRotation();
 let mapReady = false, pendingSearch = false;
 
 map.on('load', () => {
-  localizeLabels();
   map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  // 比べるもう1本のルート（灰色。タップで切り替え）
+  map.addSource('route-alt', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
   map.addLayer({
-    id: 'route-casing', type: 'line', source: 'route',
+    id: 'route-alt-casing', type: 'line', source: 'route-alt', slot: 'middle',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.8 }
+  });
+  map.addLayer({
+    id: 'route-alt-line', type: 'line', source: 'route-alt', slot: 'middle',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: { 'line-color': '#7d8a84', 'line-width': 5, 'line-opacity': 0.85 }
+  });
+  map.on('click', 'route-alt-line', () => { if (!riding && state.routes.length > 1) selectRoute(1 - state.routeIdx); });
+  map.addLayer({
+    id: 'route-casing', type: 'line', source: 'route', slot: 'middle',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': '#ffffff', 'line-width': 9 }
   });
@@ -119,7 +177,7 @@ map.on('load', () => {
   GRADES.forEach((g, i) => colorExpr.push(i, g.color));
   colorExpr.push(GRADES[0].color);
   map.addLayer({
-    id: 'route-line', type: 'line', source: 'route',
+    id: 'route-line', type: 'line', source: 'route', slot: 'middle',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: { 'line-color': colorExpr, 'line-width': 5 }
   });
@@ -133,15 +191,7 @@ map.on('error', e => {
   }
 });
 
-// 地名を日本語表示にする
-function localizeLabels() {
-  for (const l of map.getStyle().layers) {
-    if (l.type !== 'symbol') continue;
-    const tf = map.getLayoutProperty(l.id, 'text-field');
-    if (!tf || !JSON.stringify(tf).includes('"name')) continue;
-    try { map.setLayoutProperty(l.id, 'text-field', ['coalesce', ['get', 'name_ja'], ['get', 'name']]); } catch (e) { /* 無視 */ }
-  }
-}
+// 地名の日本語表示は、地図を作るときの language: 'ja' で行う（Standard の地図）
 
 // ---------- 地図上の印 ----------
 let markers = [], hereMarker = null, cursorMarker = null;
@@ -188,7 +238,7 @@ function getHere() {
   return new Promise((resolve, reject) => {
     if (!navigator.geolocation) return reject(new Error('位置情報が使えません'));
     navigator.geolocation.getCurrentPosition(
-      p => resolve({ lng: p.coords.longitude, lat: p.coords.latitude }),
+      p => { themeAt = [p.coords.longitude, p.coords.latitude]; resolve({ lng: p.coords.longitude, lat: p.coords.latitude }); },
       err => reject(err),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
     );
@@ -243,6 +293,7 @@ function setPoint(i, lng, lat, name) {
   if (riding) return; // 走行中は地点を変えない
   const p = state.points[i];
   if (!p) return;
+  if (!themeAt) themeAt = [lng, lat];
   p.lng = lng; p.lat = lat;
   p.name = name || '地図上の地点';
   if (!name) {
@@ -352,6 +403,7 @@ async function runSearch(q) {
     li.innerHTML = `<b>${esc(r.name)}</b><small>${esc(r.sub)}</small>`;
     li.addEventListener('click', () => {
       closeModals();
+      if (riding) { if (typeof rideRetarget === 'function') rideRetarget(state.editIndex === 'rideVia' ? 'via' : 'goal', r.lng, r.lat, r.name); return; }
       setPoint(state.editIndex, r.lng, r.lat, r.name);
       if (!canSearch()) map.easeTo({ center: [r.lng, r.lat], zoom: Math.max(map.getZoom(), 14) });
     });
@@ -391,9 +443,10 @@ $('#btnUseHere').addEventListener('click', async () => {
 let pressTimer = null, pressPoint = null;
 function cancelPress() { clearTimeout(pressTimer); pressTimer = null; pressPoint = null; }
 function openPick(lngLat) {
-  if (riding || !$('#pickModal').hidden) return;
+  if (document.body.classList.contains('locked') || document.body.classList.contains('journey')) return;
+  if (!$('#pickModal').hidden || !$('#ridePickModal').hidden) return;
   state.pickLngLat = lngLat;
-  openModal('#pickModal');
+  openModal(riding ? '#ridePickModal' : '#pickModal');
 }
 map.on('touchstart', e => {
   if (!e.originalEvent.touches || e.originalEvent.touches.length !== 1) { cancelPress(); return; }
@@ -459,6 +512,8 @@ function openSettings() {
   $('#prefOpts').innerHTML = Object.entries(PREFS).map(([k, name]) =>
     `<label><input type="radio" name="pref" value="${k}" ${k === state.pref ? 'checked' : ''}>${name}</label>`).join('');
   $('#speedInput').value = state.avgSpeed || '';
+  $('#themeOpts').innerHTML = [['auto', '自動（日の入り〜日の出は暗く）'], ['light', 'いつも明るい'], ['dark', 'いつも暗い']]
+    .map(([k, name]) => `<label><input type="radio" name="theme" value="${k}" ${k === state.theme ? 'checked' : ''}>${name}</label>`).join('');
   const L = state.learned || {};
   const lines = Object.entries(BIKES).filter(([k]) => L[k]).map(([k, b]) => `${b.name} ${L[k].v.toFixed(1)}km/h（最近${L[k].n}回の記録から）`);
   $('#learnedNote').textContent = lines.length
@@ -476,7 +531,10 @@ $('#btnSaveSettings').addEventListener('click', () => {
   if (pref) state.pref = pref.value;
   const v = parseFloat($('#speedInput').value);
   state.avgSpeed = v >= 5 && v <= 50 ? v : null;
+  const th = document.querySelector('input[name=theme]:checked');
+  if (th) state.theme = th.value;
   saveSettings();
+  applyTheme();
   renderCond();
   closeModals();
   if (canSearch()) searchRoute();
@@ -505,14 +563,15 @@ async function orsRoute(profile, body) {
 }
 
 // ORSにルートを頼む（細かい条件が通らなければ条件を外してもう一度）
-async function fetchRoute(coordinates) {
+async function fetchRoute(coordinates, pref) {
+  pref = pref || state.pref;
   const bike = BIKES[state.bike];
-  const preference = state.pref === 'fast' ? 'fastest' : 'recommended';
+  const preference = pref === 'fast' ? 'fastest' : 'recommended';
   const full = {
     coordinates, elevation: true, instructions: true, preference,
     options: { avoid_features: ['steps', 'ferries'] }
   };
-  if (state.pref === 'flat') full.options.profile_params = { weightings: { steepness_difficulty: 0 } };
+  if (pref === 'flat') full.options.profile_params = { weightings: { steepness_difficulty: 0 } };
   try {
     return { j: await orsRoute(bike.profile, full), note: '' };
   } catch (e1) {
@@ -531,9 +590,14 @@ async function searchRoute() {
   $('#btnSearch').hidden = true;
   msg('ルートを検索中…');
   const pts = state.points.filter(p => p.lng != null);
-  let res;
+  let res, alt = null;
+  const coords = pts.map(p => [p.lng, p.lat]);
+  // 比べる相手：「速さ優先」なら「走りやすさ優先」、それ以外なら「速さ優先」
+  const altPref = state.pref === 'fast' ? 'easy' : 'fast';
+  const altP = fetchRoute(coords, altPref).catch(() => null);
   try {
-    res = await fetchRoute(pts.map(p => [p.lng, p.lat]));
+    res = await fetchRoute(coords);
+    alt = await altP;
   } catch (e2) {
     if (seq === searchSeq) {
       msg('ルートが見つかりませんでした：' + e2.message, true);
@@ -551,6 +615,20 @@ async function searchRoute() {
     const route = await makeRoute(f, true);
     if (seq !== searchSeq || riding) return;
     route.wpPts = pts.map(p => ({ name: p.name, lng: p.lng, lat: p.lat }));
+    route.pref = state.pref;
+    const routes = [route];
+    const fa = alt && alt.j.features && alt.j.features[0];
+    if (fa) {
+      try {
+        const r2 = await makeRoute(fa, true);
+        r2.wpPts = route.wpPts;
+        r2.pref = altPref;
+        if (!sameRoute(route, r2)) routes.push(r2);
+      } catch (e) { /* もう1本は出さない */ }
+    }
+    if (seq !== searchSeq || riding) return;
+    state.routes = routes;
+    state.routeIdx = 0;
     showRoute(route);
     const notes = [res.note];
     if (route.elevSrc !== 'gsi') notes.push('※国土地理院の標高が取れなかったため、坂は粗いデータで表示しています');
@@ -560,10 +638,69 @@ async function searchRoute() {
   }
 }
 
+// 2本のルートがほとんど同じ道か（もう1本の道筋の9割以上が、1本目から30m以内）
+function sameRoute(a, b) {
+  const S = a.samples, T = b.samples;
+  if (Math.abs(a.total - b.total) > Math.max(200, a.total * 0.05)) return false;
+  const cell = 0.0005, grid = new Map();
+  S.forEach(p => { const k = Math.round(p.lng / cell) + '_' + Math.round(p.lat / cell); (grid.get(k) || grid.set(k, []).get(k)).push(p); });
+  let near = 0, n = 0;
+  for (let i = 0; i < T.length; i += 3) {
+    n++;
+    const q = T[i], gx = Math.round(q.lng / cell), gy = Math.round(q.lat / cell);
+    let ok = false;
+    for (let dx = -1; dx <= 1 && !ok; dx++) for (let dy = -1; dy <= 1 && !ok; dy++) {
+      (grid.get((gx + dx) + '_' + (gy + dy)) || []).forEach(p => { if (!ok && haversine([p.lng, p.lat], [q.lng, q.lat]) <= 30) ok = true; });
+    }
+    if (ok) near++;
+  }
+  return n > 0 && near / n >= 0.9;
+}
+
+function routeMinutes(r) {
+  const b = BIKES[state.bike];
+  return r.dist / 1000 / planSpeed().v * 60 + r.ascent / 10 * b.climb;
+}
+
+// 比べるルートの切り替えボタンと、地図の灰色の線
+function renderRouteChoice() {
+  const box = $('#routeChoice');
+  if (state.routes.length < 2) { box.hidden = true; box.innerHTML = ''; return; }
+  box.hidden = false;
+  box.innerHTML = state.routes.map((r, i) =>
+    `<button data-i="${i}" class="${i === state.routeIdx ? 'on' : ''}"><b>${'AB'[i]}</b> ${esc(PREFS[r.pref] || '')}<br>` +
+    `<span>${(r.dist / 1000).toFixed(1)}km・${fmtDur(routeMinutes(r))}・↑${Math.round(r.ascent)}m</span></button>`).join('');
+}
+$('#routeChoice').addEventListener('click', e => {
+  const b = e.target.closest('button[data-i]');
+  if (b) selectRoute(Number(b.dataset.i));
+});
+function updAltLayer() {
+  if (!mapReady || !map.getSource('route-alt')) return;
+  const other = state.routes.length > 1 && !riding ? state.routes[1 - state.routeIdx] : null;
+  map.getSource('route-alt').setData(other
+    ? { type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: other.coords.map(c => [c[0], c[1]]) } }] }
+    : { type: 'FeatureCollection', features: [] });
+}
+function selectRoute(i) {
+  if (!state.routes[i] || riding) return;
+  state.routeIdx = i;
+  state.route = state.routes[i];
+  setRouteLayer(state.route);
+  updAltLayer();
+  updateResult();
+  renderRouteChoice();
+  if (cursorMarker) cursorMarker.remove();
+  drawProfile(null);
+}
+
 function clearRoute() {
   state.route = null;
+  state.routes = [];
   searchSeq++;
   if (mapReady) map.getSource('route').setData({ type: 'FeatureCollection', features: [] });
+  updAltLayer();
+  renderRouteChoice();
   setMode('edit');
   if (cursorMarker) cursorMarker.remove();
 }
@@ -695,21 +832,38 @@ function setRouteLayer(route) {
 }
 
 function showRoute(route) {
+  // 1本だけのルート（記録の道・GPX・引き直し）は比べる相手なし
+  if (!state.routes.includes(route)) { state.routes = [route]; state.routeIdx = 0; }
   state.route = route;
   setRouteLayer(route);
+  updAltLayer();
+  renderRouteChoice();
   if (cursorMarker) cursorMarker.remove();
   updateResult();
   $('#profileInfo').textContent = 'グラフを指でなぞると、地図にその地点が出ます';
-  setMode('result', { detail: innerWidth >= 760 });
+  setMode('result', { detail: innerWidth >= 760 && innerHeight > 520 });
   const b = new mapboxgl.LngLatBounds();
-  route.coords.forEach(c => b.extend([c[0], c[1]]));
+  state.routes.forEach(r => r.coords.forEach(c => b.extend([c[0], c[1]])));
   map.fitBounds(b, { padding: fitPadding(), maxZoom: 16, duration: 600 });
 }
 
+// パネルの置き場所（下いっぱい・右の列・左の列・小さな箱）から、地図が見えている範囲を出す
+function visibleRect() {
+  const W = innerWidth, H = innerHeight;
+  const v = { left: 0, right: W, top: 0, bottom: H };
+  const pn = $('#panel');
+  if (!pn) return v;
+  const r = pn.getBoundingClientRect(); // パネルは position:fixed なので offsetParent は使えない
+  if (!r.width || !r.height) return v;
+  if (r.width > W * 0.7) v.bottom = Math.max(H * 0.3, r.top);          // 縦向き：下いっぱい
+  else if (pn.classList.contains('mode-ride')) return v;                // 走行中の右下の小さな箱は、地図を全画面のまま使う
+  else if (r.left > W / 2) v.right = r.left;                            // 横向き：右の列
+  else if (r.right < W / 2) v.left = r.right;                           // パソコン：左の列
+  return v;
+}
 function fitPadding() {
-  if (innerWidth >= 760) return { top: 70, bottom: 40, left: 420, right: 40 };
-  const ph = $('#panel').offsetHeight;
-  return { top: 70, bottom: Math.min(ph + 20, innerHeight * 0.6), left: 30, right: 30 };
+  const v = visibleRect();
+  return { top: 70, bottom: innerHeight - v.bottom + 20, left: v.left + 30, right: innerWidth - v.right + 30 };
 }
 
 function updateResult() {
@@ -879,6 +1033,9 @@ function setMode(mode, opts = {}) {
   $('#btnBackResult').hidden = !(mode === 'edit' && state.route);
   updDetailBtn();
   if (mode === 'result') drawProfile(null);
+  updAltLayer();
+  applyPanelH();
+  setTimeout(layoutChanged, 0);
 }
 function updDetailBtn() {
   $('#btnDetail').textContent = $('#panel').classList.contains('detail') ? '閉じる ▴' : '詳しく ▾';
@@ -889,23 +1046,85 @@ function toggleDetail() {
   drawProfile(null);
 }
 $('#btnEdit').addEventListener('click', () => setMode('edit'));
-$('#btnBackResult').addEventListener('click', () => setMode('result', { detail: innerWidth >= 760 }));
+$('#btnBackResult').addEventListener('click', () => setMode('result', { detail: innerWidth >= 760 && innerHeight > 520 }));
 $('#btnDetail').addEventListener('click', toggleDetail);
 
 // ---------- パネルの開閉と表示調整 ----------
-$('#panelHandle').addEventListener('click', () => {
+function handleTap() {
   const pn = $('#panel');
   if (pn.classList.contains('mode-result')) toggleDetail();
   else if (pn.classList.contains('mode-edit')) pn.classList.toggle('collapsed');
   else if (pn.classList.contains('mode-ride')) toggleRideFull();
-});
-
-if (window.ResizeObserver) {
-  new ResizeObserver(() => {
-    const ph = innerWidth >= 760 ? 0 : $('#panel').offsetHeight;
-    document.documentElement.style.setProperty('--ph', ph + 'px');
-  }).observe($('#panel'));
 }
+
+// 縦向きのとき、つまみを上下に動かすとパネルの高さ（＝地図の広さ）が変わる。2回タップで元に戻す
+const PH_KEY = 'chari_panel_h';
+let panelH = null; // 画面の高さに対する割合（0.2〜0.8）。null は初めの高さ
+try { const v = Number(localStorage.getItem(PH_KEY)); if (v >= 0.2 && v <= 0.8) panelH = v; } catch (e) { /* 無視 */ }
+const isPortraitPanel = () => innerWidth < 760 && !(matchMedia('(orientation: landscape)').matches && innerHeight <= 520);
+function applyPanelH() {
+  const pn = $('#panel');
+  const use = panelH != null && isPortraitPanel() && !pn.classList.contains('mode-ride');
+  pn.style.maxHeight = use ? Math.round(innerHeight * panelH) + 'px' : '';
+  pn.classList.toggle('sized', use);
+}
+let hDrag = null, lastTap = 0;
+const hd = $('#panelHandle');
+hd.addEventListener('pointerdown', e => {
+  hDrag = { y: e.clientY, h: $('#panel').offsetHeight, moved: false };
+  try { hd.setPointerCapture(e.pointerId); } catch (err) { /* 無視 */ }
+});
+hd.addEventListener('pointermove', e => {
+  if (!hDrag || !isPortraitPanel() || $('#panel').classList.contains('mode-ride')) return;
+  const dy = e.clientY - hDrag.y;
+  if (!hDrag.moved && Math.abs(dy) < 6) return;
+  hDrag.moved = true;
+  const pn = $('#panel');
+  pn.classList.remove('collapsed');
+  panelH = Math.min(0.8, Math.max(0.2, (hDrag.h - dy) / innerHeight));
+  applyPanelH();
+});
+hd.addEventListener('pointerup', () => {
+  if (!hDrag) return;
+  const moved = hDrag.moved;
+  hDrag = null;
+  if (moved) {
+    try { localStorage.setItem(PH_KEY, String(panelH)); } catch (e) { /* 無視 */ }
+    if (state.route) drawProfile(null);
+    return;
+  }
+  const now = Date.now();
+  if (now - lastTap < 350) { // 2回タップ：初めの高さに戻す
+    panelH = null;
+    try { localStorage.removeItem(PH_KEY); } catch (e) { /* 無視 */ }
+    applyPanelH();
+    lastTap = 0;
+    return;
+  }
+  lastTap = now;
+  handleTap();
+});
+hd.addEventListener('pointercancel', () => { hDrag = null; });
+
+function layoutChanged() {
+  const pn = $('#panel');
+  const r = pn.getBoundingClientRect();
+  const W = innerWidth;
+  const bottomFull = r.width > W * 0.7;
+  const st = document.documentElement.style;
+  st.setProperty('--ph', (bottomFull ? pn.offsetHeight : 0) + 'px');
+  st.setProperty('--pl', (!bottomFull && r.right < W / 2 ? Math.round(r.right + 4) : 0) + 'px');
+  st.setProperty('--pr', (!bottomFull && r.left > W / 2 ? Math.round(W - r.left + 4) : 0) + 'px');
+  document.body.classList.toggle('land', matchMedia('(orientation: landscape)').matches && innerHeight <= 520);
+}
+if (window.ResizeObserver) new ResizeObserver(layoutChanged).observe($('#panel'));
+window.addEventListener('resize', () => { applyPanelH(); layoutChanged(); try { map.resize(); } catch (e) { /* 無視 */ } });
+window.addEventListener('orientationchange', () => setTimeout(() => {
+  applyPanelH(); layoutChanged();
+  try { map.resize(); } catch (e) { /* 無視 */ }
+  if (state.route && !riding) drawProfile(null);
+}, 300));
+layoutChanged();
 
 if (CONFIG.SERIES_TOP_URL) {
   const a = $('#seriesLink');
@@ -919,7 +1138,6 @@ if ('serviceWorker' in navigator && location.protocol === 'https:') {
 }
 
 // ---------- 起動 ----------
-loadSettings();
 const fromUrl = loadFromUrl();
 renderPoints();
 renderCond();
