@@ -61,6 +61,7 @@ function renderHistory() {
 
   const ul = $('#histList');
   $('#histAll').hidden = !histList.length;
+  if (typeof renderHikae === 'function') renderHikae();
   if (!histList.length) {
     ul.innerHTML = '<li class="muted">まだ記録がありません</li>';
     return;
@@ -74,7 +75,7 @@ function renderHistory() {
       (open
         ? `<div class="h-detail">最高 ${(r.maxSpd || 0).toFixed(1)}km/h・登り ${Math.round(r.up || 0)}m・経過 ${fmtHMS(r.elapsedMs || 0)}</div>` +
           (r.avgHr || r.avgCad ? `<div class="h-detail">${r.avgHr ? `心拍 平均${r.avgHr}・最高${r.maxHr}bpm` : ''}${r.avgHr && r.avgCad ? '・' : ''}${r.avgCad ? `ケイデンス 平均${r.avgCad}rpm` : ''}</div>` : '') +
-          `<div class="h-btns"><button data-act="route" class="go-t">この道を走る</button><button data-act="map">地図で見る</button></div>` +
+          `<div class="h-btns"><button data-act="route" class="go-t">この道を走る</button><button data-act="sum">まとめ</button><button data-act="map">地図で見る</button></div>` +
           `<div class="h-btns"><button data-act="gpx">GPX</button><button data-act="del" class="danger-t">削除</button></div>`
         : '') +
       '</li>';
@@ -96,6 +97,9 @@ $('#histList').addEventListener('click', async e => {
   } else if (b.dataset.act === 'map') {
     closeModals();
     showTrack(r);
+  } else if (b.dataset.act === 'sum') {
+    closeModals();
+    openSummary(r);
   } else if (b.dataset.act === 'gpx') {
     downloadGpx([r], `chari_${stamp(r.start)}.gpx`);
   } else if (b.dataset.act === 'del') {

@@ -196,41 +196,30 @@ function fmtLeft(b, s) {
 }
 
 // ---------- 保存したときの知らせ（ride.js の saveAndReport から呼ぶ） ----------
-function appendDone(html) {
-  const div = document.createElement('div');
-  div.className = 'play-ev';
-  div.innerHTML = html;
-  $('#doneBody').appendChild(div);
-}
-
+// 版19：画面への表示はまとめカード（matome.js）。ここは読み上げと、峠を調べること
 async function afterSavePlay(rec, all) {
   const before = all.filter(r => r.id !== rec.id);
   const meshB = meshOfRides(before).size;
   const meshA = meshOfRides(all).size;
   const sB = playStats(before, meshB), sA = playStats(all, meshA);
-  const lines = [], talk = [];
-  if (meshA > meshB) {
-    lines.push(`🟧 新しいマスを${meshA - meshB}個塗りました（合計${meshA}マス）`);
-    talk.push(`新しいマスを${meshA - meshB}個塗りました`);
-  }
-  BADGES.filter(b => earned(b, sA) && !earned(b, sB)).forEach(b => {
-    lines.push(`${b.icon} バッジ獲得：${b.name}`);
-    talk.push(`バッジ獲得、${b.name}`);
-  });
-  if (lines.length) appendDone(lines.map(l => `<div>${esc(l)}</div>`).join(''));
+  const talk = [];
+  if (meshA > meshB) talk.push(`新しいマスを${meshA - meshB}個塗りました`);
+  BADGES.filter(b => earned(b, sA) && !earned(b, sB)).forEach(b => talk.push(`バッジ獲得、${b.name}`));
   talk.forEach(t => speak(t));
 
   // 峠は通信して調べるので、少し後から知らせる
   try {
     const passes = await checkRidePasses(rec);
+    if (typeof sumRefresh === 'function') sumRefresh(rec);
     if (!passes.length) return;
     const allNow = all.map(r => (r.id === rec.id ? rec : r));
     const pB = playStats(all, meshA), pA = playStats(allNow, meshA); // 違いは峠だけ
-    const pl = [`🔖 ${passes.map(p => p.name).join('・')}を通過しました（スタンプ）`];
-    BADGES.filter(b => earned(b, pA) && !earned(b, pB)).forEach(b => pl.push(`${b.icon} バッジ獲得：${b.name}`));
-    appendDone(pl.map(l => `<div>${esc(l)}</div>`).join(''));
     speak(`${passes.map(p => p.name).join('、')}を通過しました。スタンプを押しました`);
-  } catch (e) { /* 通信できないときは、あとで「過去の記録も調べる」から */ }
+    BADGES.filter(b => earned(b, pA) && !earned(b, pB)).forEach(b => speak(`バッジ獲得、${b.name}`));
+  } catch (e) {
+    // 通信できないときは、あとで「過去の記録も調べる」から
+    if (typeof sumRefresh === 'function') sumRefresh(rec, { passFail: true });
+  }
 }
 
 // ---------- 履歴画面のタブ ----------

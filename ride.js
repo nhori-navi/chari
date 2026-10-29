@@ -976,7 +976,7 @@ async function saveAndReport(rec, talk) {
     const all = await allRides();
     const total = all.reduce((s, x) => s + (x.dist || 0), 0);
     const ev = typeof journeyEvents === 'function' ? journeyEvents((total - rec.dist) / 1000, total / 1000) : [];
-    showDone(rec, all.length, total, ev);
+    await openSummary(rec, { live: true }); // 版19：まとめカード（matome.js）
     if (talk) {
       speak(`記録を保存しました。${(rec.dist / 1000).toFixed(1)}キロ、走行時間${Math.round(rec.movingMs / 60000)}分でした`);
       // 旅の知らせ（多いときは最後の3つ）
@@ -986,33 +986,6 @@ async function saveAndReport(rec, talk) {
   } catch (e) {
     msg('記録の保存に失敗しました：' + (e && e.message ? e.message : e), true);
   }
-}
-
-function showDone(rec, count, total, ev) {
-  const avg = rec.movingMs > 0 ? rec.dist / 1000 / (rec.movingMs / 3600000) : 0;
-  const row = (k, v) => `<div><span class="label">${k}</span><span>${v}</span></div>`;
-  $('#doneBody').innerHTML =
-    (rec.routeName ? `<p class="hint">${esc(rec.routeName)}</p>` : '') +
-    '<div class="stats">' +
-    row('距離', (rec.dist / 1000).toFixed(2) + ' km') +
-    row('走行時間', fmtHMS(rec.movingMs)) +
-    row('平均速度', avg.toFixed(1) + ' km/h') +
-    row('最高速度', rec.maxSpd.toFixed(1) + ' km/h') +
-    row('登り', Math.round(rec.up) + ' m') +
-    row('経過時間（止まっていた時間も含む）', fmtHMS(rec.elapsedMs)) +
-    (rec.avgHr ? row('心拍（平均／最高）', `${rec.avgHr}／${rec.maxHr} bpm`) : '') +
-    (rec.avgCad ? row('平均ケイデンス', `${rec.avgCad} rpm`) : '') +
-    '</div>' +
-    `<p class="total">これまでの記録 ${count}件・総走行距離 <b>${(total / 1000).toFixed(1)} km</b></p>` +
-    (ev && ev.length
-      ? '<div class="jr-ev"><div class="glabel">バーチャル長距離の旅</div>' +
-        (ev.length > 6 ? `<div>ほか${ev.length - 6}件…</div>` : '') +
-        ev.slice(-6).map(x => `<div class="${x.type === 'done' ? 'big' : ''}">${esc(x.text)}</div>`).join('') +
-        '<button id="btnDoneJourney" class="wide-btn">旅の地図を見る</button></div>'
-      : '');
-  const bj = document.getElementById('btnDoneJourney');
-  if (bj) bj.addEventListener('click', () => { closeModals(); openJourney(); });
-  openModal('#doneModal');
 }
 
 // ---------- 記録の保存場所（IndexedDB） ----------

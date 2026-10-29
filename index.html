@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=18" rel="stylesheet">
+<link href="style.css?v=19" rel="stylesheet">
 </head>
 <body>
 
@@ -132,7 +132,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">段階1 試作（版18）</span>
+    <span class="ver">版19</span>
   </footer>
 </section>
 
@@ -251,12 +251,20 @@
     <div id="tab-list" class="tab-pane">
     <div id="histSum" class="stats three"></div>
     <ul id="histList"></ul>
+    <div class="hk-box">
+      <div class="glabel">💾 記録の控え（引っ越し・もしものとき）</div>
+      <div id="hkState" class="hint"></div>
+      <div class="h-btns">
+        <button id="btnHkExp" class="go-t">控えを書き出す</button>
+        <label class="file-btn hk-in">控えを読み込む<input type="file" id="hkFile" accept=".json,application/json" hidden></label>
+      </div>
+      <p class="hint">記録はこの端末（このブラウザ）の中だけにあります。控えのファイルには、記録すべてと設定が入ります。機種変更や、Safari・Chrome・ホーム画面のアプリの間で移すときは、移す先で読み込んでください（今ある記録は消えません）。</p>
+    </div>
     <label class="wide-btn file-btn">GPXファイルを読み込む（コース・記録）<input type="file" id="gpxFile" hidden></label>
     <div id="histAll" class="h-all">
       <button id="btnGpxAll" class="wide-btn">全部をGPXで書き出す</button>
       <button id="btnDelAll" class="wide-btn danger-t">全部削除</button>
     </div>
-    <p class="hint">記録はこの端末（このブラウザ）の中だけに保存されます。機種変更やブラウザのデータ削除に備えて、ときどきGPXで書き出しておくと安心です。</p>
     </div>
 
     <div id="tab-mesh" class="tab-pane" hidden>
@@ -284,14 +292,8 @@
   </div>
 </div>
 
-<!-- 走り終わったとき -->
-<div id="doneModal" class="modal" hidden>
-  <div class="sheet">
-    <div class="sheet-title">おつかれさまでした</div>
-    <div id="doneBody"></div>
-    <button class="close" data-close>閉じる</button>
-  </div>
-</div>
+<!-- 走り終わりのまとめ（版19。中身は matome.js が作る） -->
+<section id="sumCard" hidden></section>
 
 <!-- センサー -->
 <div id="sensorModal" class="modal" hidden>
@@ -341,6 +343,14 @@
       <p class="hint">到着予定は「平均速度」と「登りの量」から計算した目安です。空欄なら、履歴から計算した自分の速さ（なければ自転車の種類ごとの標準の速度）を使います。</p>
       <p id="learnedNote" class="hint"></p>
     </div>
+    <div class="group">
+      <div class="glabel">体重（任意。走り終わりのカロリーの計算に使います）</div>
+      <div class="speed-row">
+        <input id="weightInput" type="number" inputmode="decimal" min="20" max="200" step="0.1" placeholder="空欄なら60">
+        <span>kg</span>
+      </div>
+      <p class="hint">この端末の中だけに保存します。</p>
+    </div>
     <button id="btnHelp2" class="wide-btn">？ 使い方（ヘルプ）</button>
     <button id="btnOpenSensor" class="wide-btn">⟳ センサー（Bluetooth）をつなぐ・タイヤの周長</button>
     <button id="btnSaveSettings" class="primary wide-btn">保存</button>
@@ -349,14 +359,16 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=18"></script>
-<script src="elev.js?v=18"></script>
-<script src="app.js?v=18"></script>
-<script src="sensor.js?v=18"></script>
-<script src="ride.js?v=18"></script>
-<script src="hist.js?v=18"></script>
-<script src="journey.js?v=18"></script>
-<script src="play.js?v=18"></script>
-<script src="help.js?v=18"></script>
+<script src="config.js?v=19"></script>
+<script src="elev.js?v=19"></script>
+<script src="app.js?v=19"></script>
+<script src="sensor.js?v=19"></script>
+<script src="ride.js?v=19"></script>
+<script src="hist.js?v=19"></script>
+<script src="journey.js?v=19"></script>
+<script src="play.js?v=19"></script>
+<script src="hikae.js?v=19"></script>
+<script src="matome.js?v=19"></script>
+<script src="help.js?v=19"></script>
 </body>
 </html>

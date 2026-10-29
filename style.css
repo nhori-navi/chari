@@ -549,3 +549,60 @@ body.riding #histChip{display:none !important}
   }
   #panel.mode-ride #panelHandle{display:none}
 }
+
+/* ===== 版19：走り終わりのまとめカード ===== */
+body.summary #panel,body.summary #histChip,body.summary #playChip{display:none !important}
+#sumCard{
+  position:fixed;left:0;right:0;bottom:0;z-index:6;
+  max-height:64vh;overflow-y:auto;
+  background:var(--panel);border-radius:16px 16px 0 0;
+  box-shadow:0 -2px 12px rgba(0,0,0,.25);
+  padding:12px 14px calc(12px + env(safe-area-inset-bottom,0px));
+}
+@media (min-width:760px){
+  #sumCard{left:12px;right:auto;top:auto;bottom:12px;width:390px;max-height:calc(100% - 84px);border-radius:16px}
+}
+@media (orientation:landscape) and (max-height:520px){
+  #sumCard{
+    left:auto;right:calc(8px + env(safe-area-inset-right,0px));top:8px;bottom:8px;
+    width:330px;max-height:none;border-radius:14px;
+  }
+}
+.sm-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.sm-title{font-weight:800;font-size:18px;color:var(--accent)}
+.sm-sub{font-size:12px;color:var(--sub);margin-top:2px}
+#sumX{flex:0 0 auto;width:32px;height:32px;border-radius:50%;border:none;background:var(--line);font-size:18px;line-height:1}
+.sm-big{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px}
+.sm-big>div{
+  background:var(--bg);border:1px solid var(--line);border-radius:10px;
+  padding:8px 6px 6px;text-align:center;display:flex;flex-direction:column;align-items:center;
+}
+.sm-big b{font-size:22px;font-weight:800;line-height:1.1;font-variant-numeric:tabular-nums}
+.sm-big small{font-size:11px;color:var(--sub);margin-top:1px}
+.sm-big span{font-size:11px;color:var(--sub);margin-top:3px}
+.sm-small{font-size:12px;color:var(--sub);margin:6px 2px 0;line-height:1.6}
+.sm-gains{margin-top:10px;border-radius:10px;background:rgba(61,139,110,.10);padding:4px 10px}
+.sm-row{display:flex;gap:8px;align-items:flex-start;padding:6px 0;font-size:14px;line-height:1.5;border-bottom:1px solid rgba(61,139,110,.15)}
+.sm-row:last-child{border-bottom:none}
+.sm-ic{flex:0 0 auto;width:22px;text-align:center}
+.sm-row b{color:var(--fg)}
+.sm-row small{display:block;font-size:11px;color:var(--sub)}
+.sm-row.sm-muted{color:var(--sub)}
+.sm-row.sm-big-ev b{color:#c0602a;font-size:15px}
+.sm-today{margin-top:8px;padding:8px 10px;border-radius:10px;border:1px solid var(--line);font-size:13px}
+.sm-today b{color:var(--accent)}
+.sm-nudge{margin-top:8px;padding:10px;border-radius:10px;background:#fff6c9;color:#3a3200;font-size:14px;line-height:1.5}
+:root[data-theme="dark"] .sm-nudge{background:#3a3418;color:#f1e7b0}
+.sm-hk{margin-top:8px;padding:10px;border-radius:10px;border:1px dashed var(--accent);font-size:13px;line-height:1.5}
+.sm-hk button{display:block;margin-top:6px;padding:8px 12px;border-radius:8px;border:1px solid var(--accent);background:var(--bg);color:var(--accent);font-weight:700}
+.sm-total{margin:10px 2px 0;font-size:13px;color:var(--sub)}
+.sm-total b{color:var(--accent);font-size:15px}
+.sm-btns{display:flex;gap:6px;margin-top:10px}
+.sm-btns button{flex:1 1 0;padding:12px 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
+#sumClose{background:var(--line);border:none}
+
+/* 版19：記録の控え */
+.hk-box{margin-top:14px;padding-top:10px;border-top:1px solid var(--line)}
+.hk-box .hint{margin-top:2px}
+.hk-in{flex:1 1 0;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);text-align:center}
+#btnHkExp:disabled{opacity:.45}

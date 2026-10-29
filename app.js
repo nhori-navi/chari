@@ -4,6 +4,8 @@
    ・坂の断面図、登り下り、最大勾配、所要時間と到着予定
    ・共有リンク                                            */
 
+const CHARI_VER = 19; // 版の番号（index.html の ?v= と同じにする）
+
 // ---------- 基本の設定値 ----------
 // profile：OpenRouteServiceの自転車の種類
 // speed：平地での標準の速度（km/h）
@@ -77,16 +79,18 @@ function loadSettings() {
     if (PREFS[s.pref]) state.pref = s.pref;
     if (s.avgSpeed > 0) state.avgSpeed = s.avgSpeed;
     if (['auto', 'light', 'dark'].includes(s.theme)) state.theme = s.theme;
+    if (s.weight >= 20 && s.weight <= 200) state.weight = s.weight;
   } catch (e) { /* 保存領域が使えない場合は初期値のまま */ }
 }
 function saveSettings() {
   try {
-    localStorage.setItem('chari_settings', JSON.stringify({ bike: state.bike, pref: state.pref, avgSpeed: state.avgSpeed, theme: state.theme }));
+    localStorage.setItem('chari_settings', JSON.stringify({ bike: state.bike, pref: state.pref, avgSpeed: state.avgSpeed, theme: state.theme, weight: state.weight }));
   } catch (e) { /* 無視 */ }
 }
 
 let riding = false; // 走行中か（ride.js が切り替える）
 state.theme = 'auto';
+state.weight = null; // 版19：体重（kg）。カロリーの計算に使う。空なら60kgで計算
 state.routes = [];   // 版15：比べるルート（1〜2本）
 state.routeIdx = 0;
 loadSettings();
@@ -512,6 +516,7 @@ function openSettings() {
   $('#prefOpts').innerHTML = Object.entries(PREFS).map(([k, name]) =>
     `<label><input type="radio" name="pref" value="${k}" ${k === state.pref ? 'checked' : ''}>${name}</label>`).join('');
   $('#speedInput').value = state.avgSpeed || '';
+  $('#weightInput').value = state.weight || '';
   $('#themeOpts').innerHTML = [['auto', '自動（日の入り〜日の出は暗く）'], ['light', 'いつも明るい'], ['dark', 'いつも暗い']]
     .map(([k, name]) => `<label><input type="radio" name="theme" value="${k}" ${k === state.theme ? 'checked' : ''}>${name}</label>`).join('');
   const L = state.learned || {};
@@ -531,6 +536,8 @@ $('#btnSaveSettings').addEventListener('click', () => {
   if (pref) state.pref = pref.value;
   const v = parseFloat($('#speedInput').value);
   state.avgSpeed = v >= 5 && v <= 50 ? v : null;
+  const w = parseFloat($('#weightInput').value);
+  state.weight = w >= 20 && w <= 200 ? Math.round(w * 10) / 10 : null;
   const th = document.querySelector('input[name=theme]:checked');
   if (th) state.theme = th.value;
   saveSettings();
@@ -953,7 +960,7 @@ function showRoute(route) {
 function visibleRect() {
   const W = innerWidth, H = innerHeight;
   const v = { left: 0, right: W, top: 0, bottom: H };
-  const pn = $('#panel');
+  const pn = document.body.classList.contains('summary') ? $('#sumCard') : $('#panel');
   if (!pn) return v;
   const r = pn.getBoundingClientRect(); // パネルは position:fixed なので offsetParent は使えない
   if (!r.width || !r.height) return v;
@@ -1209,7 +1216,7 @@ hd.addEventListener('pointerup', () => {
 hd.addEventListener('pointercancel', () => { hDrag = null; });
 
 function layoutChanged() {
-  const pn = $('#panel');
+  const pn = document.body.classList.contains('summary') ? $('#sumCard') : $('#panel');
   const r = pn.getBoundingClientRect();
   const W = innerWidth;
   const bottomFull = r.width > W * 0.7;
