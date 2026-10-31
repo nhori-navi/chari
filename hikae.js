@@ -122,6 +122,7 @@ async function hkImport(file) {
   renderHistory();
   refreshLearned();
   msg(text);
+  if (typeof decideNote === 'function') decideNote();
 }
 
 $('#btnHkExp').addEventListener('click', hkExport);

@@ -1064,5 +1064,8 @@ $('#btnRide').addEventListener('click', onRideButton);
 $('#btnFreeRide').addEventListener('click', () => { primeSpeech(); startRide(false); });
 
 // 地図の準備ができたら、途中の記録がないか確かめる
-if (mapReady) checkResume(); else map.on('load', () => setTimeout(checkResume, 0));
+// 版20：電波がなく地図が読めないときも、8秒たったら確かめる
+let resumeDone = false;
+function runResume() { if (resumeDone) return; resumeDone = true; checkResume(); }
+if (mapReady) runResume(); else { map.on('load', () => setTimeout(runResume, 0)); setTimeout(runResume, 8000); }
 refreshLearned();

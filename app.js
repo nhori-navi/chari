@@ -4,7 +4,7 @@
    ・坂の断面図、登り下り、最大勾配、所要時間と到着予定
    ・共有リンク                                            */
 
-const CHARI_VER = 19; // 版の番号（index.html の ?v= と同じにする）
+const CHARI_VER = 20; // 版の番号（index.html の ?v= と同じにする）
 
 // ---------- 基本の設定値 ----------
 // profile：OpenRouteServiceの自転車の種類
@@ -136,6 +136,11 @@ const keysOk = !!(CONFIG.MAPBOX_TOKEN && !CONFIG.MAPBOX_TOKEN.includes('ここ�
                   CONFIG.ORS_KEY && !CONFIG.ORS_KEY.includes('ここに'));
 
 // ---------- 地図 ----------
+// 版20：電波のない所で初めて開き、地図の部品が読めなかったとき
+if (typeof mapboxgl === 'undefined') {
+  document.body.insertAdjacentHTML('beforeend', '<div style="position:fixed;inset:0;z-index:99;background:var(--bg);padding:30px 20px;line-height:1.7;font-size:15px">📵 地図の部品を読み込めませんでした。<br>電波のある所で開き直してください。一度開けば、次からは電波がなくても画面が開きます。<br><br><button onclick="location.reload()" style="padding:10px 16px;border-radius:8px;border:1px solid #3d8b6e;background:none;color:#3d8b6e;font-weight:700">もう一度読み込む</button></div>');
+  throw new Error('mapboxgl がありません（電波なし）');
+}
 mapboxgl.accessToken = CONFIG.MAPBOX_TOKEN;
 const map = new mapboxgl.Map({
   container: 'map',
@@ -677,6 +682,11 @@ async function searchRoute() {
   if (!canSearch()) { msg('出発地と目的地を指定してください', true); return; }
   if (!mapReady) { pendingSearch = true; return; }
   if (!keysOk) { msg('config.js にキーを設定してください', true); return; }
+  if (navigator.onLine === false) { // 版20：電波がないときは検索しない
+    msg('📵 電波が届いていないため、ルートを検索できません。電波のある所で「再検索」を押してください', true);
+    $('#btnSearch').hidden = false;
+    return;
+  }
 
   const seq = ++searchSeq;
   $('#btnSearch').hidden = true;

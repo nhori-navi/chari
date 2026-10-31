@@ -606,3 +606,26 @@ body.summary #panel,body.summary #histChip,body.summary #playChip{display:none !
 .hk-box .hint{margin-top:2px}
 .hk-in{flex:1 1 0;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);text-align:center}
 #btnHkExp:disabled{opacity:.45}
+
+/* ===== 版20：ホーム画面のアプリ（PWA） ===== */
+#pwaNote{
+  display:flex;align-items:center;gap:8px;margin:0 0 8px;padding:8px 8px 8px 12px;
+  border-radius:10px;background:rgba(61,139,110,.12);border:1px solid rgba(61,139,110,.35);font-size:13px;line-height:1.5;
+}
+#pwaNote>span{flex:1 1 auto}
+#pwaNote.pn-col{flex-direction:column;align-items:stretch}
+.pn-link{cursor:pointer;color:var(--accent);font-weight:700}
+.pn-go{flex:0 0 auto;padding:7px 12px;border-radius:8px;border:none;background:var(--accent);color:#fff;font-weight:700;text-align:center;cursor:pointer}
+.pn-x{flex:0 0 auto;width:26px;height:26px;border-radius:50%;border:none;background:rgba(0,0,0,.08);color:var(--fg)}
+.pn-btns{display:flex;gap:6px;margin-top:8px}
+.pn-btns>*{flex:1 1 0}
+#pnLater{padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg)}
+body.riding #pwaNote,#panel.mode-ride #pwaNote{display:none !important}
+.pw-box{padding:10px 12px;border-radius:10px;border:1px solid rgba(61,139,110,.45);background:rgba(61,139,110,.07)}
+.pw-box .glabel{color:var(--accent);font-weight:700;font-size:14px}
+.pw-why{font-size:13px;margin:0 0 6px;line-height:1.6}
+.pw-box ol{margin:4px 0 0;padding-left:1.4em;font-size:14px;line-height:1.7}
+.pw-box p{font-size:14px;line-height:1.6}
+.pw-move{margin-top:10px;padding:10px;border-radius:8px;background:#fff6c9;color:#3a3200;font-size:13px;line-height:1.6}
+:root[data-theme="dark"] .pw-move{background:#3a3418;color:#f1e7b0}
+.pw-move .wide-btn{margin-top:8px;background:var(--bg);color:var(--accent)}

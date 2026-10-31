@@ -51,7 +51,7 @@ function journeyNowText(J) {
 }
 
 // ---------- 一言 ----------
-function avgKmh(r) { return r.movingMs > 0 ? r.dist / 1000 / (r.movingMs / 3600000) : 0; }
+function sumAvgKmh(r) { return r.movingMs > 0 ? r.dist / 1000 / (r.movingMs / 3600000) : 0; }
 function sumNudge(rec, before, upto, sA) {
   if (!before.length) return 'はじめての記録です！ ここから距離を積み上げていきましょう';
   const km = v => (v / 1000).toFixed(1);
@@ -62,8 +62,8 @@ function sumNudge(rec, before, upto, sA) {
   const fair = r => r.movingMs >= 600000 && r.dist >= 3000 && (r.bike || null) === (rec.bike || null);
   const sp = before.filter(fair);
   if (fair(rec) && sp.length >= 2) {
-    const maxV = Math.max(...sp.map(avgKmh));
-    if (avgKmh(rec) > maxV) return `同じ自転車で、これまででいちばん速い平均速度です（これまでは${maxV.toFixed(1)}km/h）`;
+    const maxV = Math.max(...sp.map(sumAvgKmh));
+    if (sumAvgKmh(rec) > maxV) return `同じ自転車で、これまででいちばん速い平均速度です（これまでは${maxV.toFixed(1)}km/h）`;
   }
   // 次のバッジがあと半分を切っていたら
   const next = BADGES.filter(b => !earned(b, sA))
@@ -98,7 +98,7 @@ function summaryHtml(rec, all) {
   const kmA = kmB + rec.dist / 1000;
   const ev = journeyEvents(kmB, kmA);
   const J = computeJourney(upto);
-  const avg = avgKmh(rec);
+  const avg = sumAvgKmh(rec);
   const rows = [];
   const row = (ic, html, cls) => rows.push(`<div class="sm-row${cls ? ' ' + cls : ''}"><span class="sm-ic">${ic}</span><span>${html}</span></div>`);
 

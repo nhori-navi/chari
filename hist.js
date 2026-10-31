@@ -138,7 +138,8 @@ $('#btnHist').addEventListener('click', openHistory);
 
 // ---------- 地図に道筋を出す ----------
 function showTrack(r) {
-  if (!mapReady || !r.track || !r.track.length) { msg('この記録には道筋がありません', true); return; }
+  if (!r.track || !r.track.length) { msg('この記録には道筋がありません', true); return; }
+  if (!mapReady) return; // 電波がなく地図が出ていないとき
   if (!map.getSource('hist')) {
     map.addSource('hist', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({

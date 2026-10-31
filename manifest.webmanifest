@@ -1,6 +1,8 @@
 {
   "name": "ChariMiru",
   "short_name": "ChariMiru",
+  "description": "坂がわかる自転車ナビと走行の記録",
+  "lang": "ja",
   "id": "/chari/",
   "start_url": "./",
   "scope": "./",
