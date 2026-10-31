@@ -13,7 +13,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>ChariMiru</title>
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.css" rel="stylesheet">
-<link href="style.css?v=19" rel="stylesheet">
+<link href="style.css?v=20" rel="stylesheet">
 </head>
 <body>
 
@@ -38,6 +38,7 @@
 
 <section id="panel" class="mode-edit">
   <div id="panelHandle" title="パネルを縮める／広げる"></div>
+  <div id="pwaNote" hidden></div>
 
   <!-- 地点を指定する画面 -->
   <div id="editArea">
@@ -132,7 +133,7 @@
 
   <footer id="footer" class="detail-only">
     <a id="seriesLink" hidden>シリーズのTOPへ</a>
-    <span class="ver">版19</span>
+    <span class="ver">版20</span>
   </footer>
 </section>
 
@@ -321,6 +322,7 @@
 <div id="settingsModal" class="modal" hidden>
   <div class="sheet">
     <div class="sheet-title">設定</div>
+    <div id="pwaBox" class="group pw-box" hidden></div>
     <div class="group">
       <div class="glabel">自転車の種類</div>
       <div id="bikeOpts" class="opts"></div>
@@ -359,16 +361,17 @@
 </div>
 
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.0/mapbox-gl.js"></script>
-<script src="config.js?v=19"></script>
-<script src="elev.js?v=19"></script>
-<script src="app.js?v=19"></script>
-<script src="sensor.js?v=19"></script>
-<script src="ride.js?v=19"></script>
-<script src="hist.js?v=19"></script>
-<script src="journey.js?v=19"></script>
-<script src="play.js?v=19"></script>
-<script src="hikae.js?v=19"></script>
-<script src="matome.js?v=19"></script>
-<script src="help.js?v=19"></script>
+<script src="config.js?v=20"></script>
+<script src="elev.js?v=20"></script>
+<script src="app.js?v=20"></script>
+<script src="sensor.js?v=20"></script>
+<script src="ride.js?v=20"></script>
+<script src="hist.js?v=20"></script>
+<script src="journey.js?v=20"></script>
+<script src="play.js?v=20"></script>
+<script src="hikae.js?v=20"></script>
+<script src="matome.js?v=20"></script>
+<script src="pwa.js?v=20"></script>
+<script src="help.js?v=20"></script>
 </body>
 </html>
